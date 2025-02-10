@@ -6,34 +6,96 @@ body {
   background-color: #f7f7f7;
 }
 
-.app {
+/* Centered Title at the Top */
+.title-container {
+  width: 100%;
   text-align: center;
-  padding: 20px;
-}
-
-h1, h2, h3 {
   margin-bottom: 20px;
 }
 
-.job-selection {
-  display: flex;
-  justify-content: center;
-  gap: 15px;
-  margin-bottom: 30px;
+h1 {
+  font-size: 28px;
+  font-weight: bold;
+  margin: 20px 0;
 }
 
-.job-box {
-  width: 150px;
-  height: 100px;
-  background-color: #007bff;
-  color: white;
+/* Main Layout: Ensuring Equal Columns */
+.app {
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  padding: 20px;
+}
+
+/* Left column (Technology Grid) */
+.left-column {
+  flex: 1;
+}
+
+/* Right column (Use Case, Workflow, JSON, Narrative) */
+.right-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Use Case Input */
+.use-case-input {
+  margin: 20px 0;
+}
+
+.use-case-input label {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.use-case-input input {
+  width: 100%;
+  padding: 10px;
+  margin-top: 5px;
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.use-case-input textarea {
+  width: 100%;
+  padding: 10px;
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  resize: none; /* Disable manual resizing */
+  overflow: hidden; /* Prevent scrollbar */
+  min-height: 40px; /* Start small, expands dynamically */
+  transition: height 0.2s ease-in-out; /* Smooth height expansion */
+}
+
+
+/* Workflow Selection */
+.workflow-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.selected-workflow, .optimal-workflow {
+  flex: 1;
+  background-color: #f9f9f9;
+  padding: 15px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  text-align: center;
+  min-height: 460px; /* Ensures both are the same height */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
   align-items: center;
-  cursor: pointer;
-  border-radius: 5px;
 }
 
+/* Workflow Box */
 .workflow {
   display: flex;
   flex-direction: column;
@@ -53,136 +115,38 @@ h1, h2, h3 {
   border-radius: 5px;
 }
 
-.save-button {
-  background-color: #28a745;
-  color: white;
-  padding: 10px 20px;
-  font-size: 16px;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  margin-top: 20px;
-}
-
-.save-button:hover {
-  background-color: #218838;
-}
-
-.download-button {
-  background-color: #FF6666;
-  color: white;
-  padding: 10px 20px;
-  font-size: 16px;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  margin-top: 10px; /* Margin to create space between buttons */
-}
-
-.download-button:hover {
-  background-color: #0c462a;
-}
-
-.status-message {
-  margin-top: 20px;
-  font-size: 16px;
-  color: #333;
-}
-
-.json-display {
-  background-color: #1e1e1e;
-  color: #f1f1f1;
-  padding: 20px;
-  border-radius: 10px;
-  margin-top: 20px;
-  text-align: left;
-  max-width: 90%;
-  margin: 20px auto;
-  overflow: auto;
-  height: 400px;
-}
-
-.json-display pre {
-  white-space: pre-wrap;
-  word-wrap: break-word;
-}
-.use-case-input {
-  margin: 20px 0;
-}
-
-.use-case-input label {
-  font-size: 16px;
-  font-weight: bold;
-}
-
-.use-case-input input {
-  width: 100%;
-  padding: 10px;
-  margin-top: 5px;
-  font-size: 14px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-}
-.optimal-order {
-  margin-top: 20px;
-  padding: 20px;
-  background-color: #f9f9f9;
-  border-radius: 8px;
-}
-
-.optimal-order h2 {
-  margin-bottom: 10px;
-  color: #333;
-}
-
-.optimal-order ul {
+/* Standardize the list styles for both sections */
+.selected-workflow .workflow,
+.optimal-workflow ul {
   list-style: none;
   padding: 0;
-}
-
-.optimal-order li {
-  padding: 5px 0;
-  font-size: 16px;
-  color: #555;
-}
-/* App.css */
-
-/* Main app layout */
-.app {
-  display: flex;
-  flex-direction: row;
-  gap: 24px;
-  padding: 20px;
-}
-
-/* Left column for the technology grid */
-.left-column {
-  flex: 2;
-}
-
-/* Right column for selected workflow details */
-.right-column {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-/* Selected workflow box */
-.workflow {
-  background-color: #f9f9f9;
-  padding: 12px;
-  border-radius: 8px;
-  border: 1px solid #ddd;
-}
-
-.use-case-input input {
+  margin: 0;
+  text-align: center; /* Center list items */
   width: 100%;
-  padding: 8px;
-  border-radius: 4px;
-  border: 1px solid #ccc;
+}
+/* Set a fixed height for workflow boxes so they don’t look oversized */
+.selected-workflow .workflow-box,
+.optimal-workflow li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #4a90e2; /* Darker blue for a more refined look */
+  color: white;
+  padding: 8px 15px;
+  border-radius: 5px;
+  font-size: 14px;
+  margin: 5px 0;
+  width: 180px; /* Set a fixed width */
+  height: 50px; /* Reduce the size */
+  margin-left: auto;
+  margin-right: auto;
+  border: 1px solid #b3b3b3;
+  position: relative; /* Needed to position delete button correctly */
+  text-align: left; /* Force text alignment to be consistent */
+
 }
 
+/* Buttons */
 button {
   padding: 10px 20px;
   border: none;
@@ -198,13 +162,81 @@ button:hover {
   background-color: #357ab8;
 }
 
-.optimal-workflow {
-  background-color: #e9f5ff;
-  padding: 12px;
-  border-radius: 8px;
-  border: 1px solid #b3d9ff;
+/* Ensure delete button is aligned across all workflow boxes */
+.delete-button {
+  background-color: #fdfdfd;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  cursor: pointer;
+  position: absolute;
+  right: 5px;
 }
-.generate-button:disabled {
-  background-color: #ccc;
-  cursor: not-allowed;
+
+/* Adjust button hover effect for better feedback */
+.delete-button:hover {
+  background-color: #c53030;
+}
+
+
+.save-button {
+  background-color: #28a745;
+}
+
+.save-button:hover {
+  background-color: #218838;
+}
+
+.download-button {
+  background-color: #28a745;
+}
+
+.download-button:hover {
+  background-color: #218838;
+}
+
+.generate-button {
+  background-color: #28a745;
+}
+.generate-button:hover {
+  background-color: #218838;
+}
+
+/* Workflow JSON & Narrative Side by Side */
+.output-container {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+/* JSON and Narrative Display Boxes */
+.json-display, .narrative-display {
+  flex: 1;
+  padding: 20px;
+  border-radius: 10px;
+  height: 800px; /* Increased height to double previous size */
+  overflow: auto;
+}
+
+.json-display {
+  background-color: #1e1e1e;
+  color: #f1f1f1;
+  text-align: left;
+}
+
+.json-display pre {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.narrative-display {
+  background-color: #f8f9fa;
+  color: #333;
+  border: 1px solid #ccc;
 }

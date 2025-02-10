@@ -193,5 +193,81 @@ def save_workflow():
         app.logger.error(f"Error occurred: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
+@app.route("/generate-narrative", methods=["POST"])
+def generate_narrative():
+    """
+    Generate a narrative explaining the workflow in detail.
+    """
+    try:
+        data = request.json
+        technologies = data.get("technologies")
+        use_case = data.get("use_case")
+        ordered_workflow = data.get("optimal_order")
+
+        if not technologies or not use_case or not ordered_workflow:
+            return jsonify({"error": "Technologies, use case, and workflow order are required."}), 400
+
+        # Use OpenAI to generate a narrative
+        completion = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+    "role": "system",
+    "content": "You are an AI assistant that generates structured, fluid, and engaging narratives explaining optimized workflows for business use cases. Your response should be professional, insightful, and easy to read, avoiding unnecessary repetition of the provided discovery information."
+},
+{
+    "role": "user",
+    "content": f"""
+    The user has provided the following **discovery information**:
+
+    **Business Challenges:**  
+    - Extract the key pain points mentioned in the discovery information.  
+
+    **Positive Business Outcomes:**  
+    - Identify the main goals and improvements the business aims to achieve.  
+
+    **Technologies Provided:**  
+    {technologies}  
+
+    **Optimized Workflow Order:**  
+    {ordered_workflow}  
+
+    **Generate a structured, fluid narrative following this format:**
+
+    ---
+    
+    **Business Challenges**  
+    Start by summarizing the key business challenges the company is facing, focusing on **operational inefficiencies, integration complexities, data management hurdles, or compliance risks**. Frame these challenges in a way that sets the stage for why an optimized workflow is needed.  
+
+    **Positive Business Outcomes**  
+    Clearly articulate what the company aims to achieve. Describe the key improvements in **efficiency, automation, data reliability, customer experience, or compliance** that they want as a result of implementing an optimized workflow.  
+
+    **Optimized Workflow Recommendation**  
+    Transition into explaining the **ideal workflow structure** based on the provided technologies.  
+
+    **Why This Order?**  
+    Explain the reasoning behind the sequencing of technologies in a **logical and easy-to-follow manner**. Ensure the explanation aligns with how data flows efficiently, dependencies between systems, and how automation ensures a seamless process.  
+
+    **Technology Contributions and Key Tasks**  
+    Break down how **each technology in the workflow contributes**, describing the role it plays and the **key tasks** it handles at that stage. This section should read smoothly and transition logically from one step to the next.  
+
+    **How This Workflow Ensures Efficiency**  
+    Conclude by tying everything together—explain how this workflow improves **scalability, reliability, automation, and business efficiency**. Highlight measurable benefits such as **reduced processing time, higher job success rates, improved visibility, and better decision-making**.  
+
+    The response should be **fluid, structured, and easy to read**, avoiding redundancy while ensuring a **clear, insightful explanation** that aligns with business priorities.
+    """
+}
+
+            ]
+        )
+
+        narrative_response = completion.choices[0].message.content.strip()
+
+        return jsonify({"narrative": narrative_response}), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == "__main__":
     app.run(debug=True)

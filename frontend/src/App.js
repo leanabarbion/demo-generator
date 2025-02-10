@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import "./App.css";
 import TechnologyGrid from "./TechnologyGrid";
+import { marked } from "marked";
+
 
 function App() {
   const [workflow, setWorkflow] = useState([]);
@@ -8,6 +10,9 @@ function App() {
   const [status, setStatus] = useState(null); // Status messages
   const [savedJSON, setSavedJSON] = useState(null); // Store the saved JSON response
   const [optimalOrder, setOptimalOrder] = useState(null); // Store the optimal order from GPT
+  const [narrative, setNarrative] = useState(""); // Store the generated narrative
+  const [isPanelOpen, setIsPanelOpen] = useState(false); // Control panel visibility
+
 
   // Add or remove technologies from the workflow
   const toggleTechnologyInWorkflow = (techName) => {
@@ -69,6 +74,38 @@ function App() {
     setTimeout(() => setStatus(null), 30000); // Automatically clear the status message after 30 seconds
   };
   
+
+  const generateNarrative = async () => {
+    if (!optimalOrder || workflow.length === 0 || !useCase.trim()) {
+      setStatus("Please generate the workflow order first.");
+      return;
+    }
+    setStatus("Generating workflow and narrative...");
+
+    try {
+      const response = await fetch("http://localhost:5000/generate-narrative", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          technologies: workflow.map((job) => job.name),
+          use_case: useCase,
+          optimal_order: optimalOrder,
+        }),
+      });
+
+      if (!response.ok) throw new Error("Failed to generate narrative.");
+      const data = await response.json();
+      setNarrative(data.narrative);
+      setIsPanelOpen(true); // Open the side panel
+      setStatus(null);
+    } catch (error) {
+      console.error("Error generating narrative:", error);
+      setStatus("Error generating narrative. Please try again.");
+    }
+  };
+
+  
+
   
   // Save the workflow to the backend
   const saveWorkflowToBackend = async () => {
@@ -117,7 +154,7 @@ function App() {
   };
 
   return (
-    <div className="app">
+    <div className={`app ${isPanelOpen ? "panel-open" : ""}`}>
       
 
       {/* Technology Grid */}
@@ -130,36 +167,39 @@ function App() {
         onToggle={toggleTechnologyInWorkflow}
       />
       </div>
+{/* Input for use case */}
+<div className="right-column">
+  <div className="use-case-input">
+    <label htmlFor="useCase">Enter Use Case:</label>
+    <textarea
+      id="useCase"
+      value={useCase}
+      onChange={(e) => setUseCase(e.target.value)}
+      onInput={(e) => {
+        e.target.style.height = "auto"; // Reset height to recalculate
+        e.target.style.height = e.target.scrollHeight + "px"; // Set height dynamically
+      }}
+      placeholder="Input your Discovery Information"
+      rows="1" // Start with one row, expands dynamically
+    />
+  </div>
 
-      {/* Input for use case */}
-      <div className="right-column">
-      <div className="use-case-input">
-        <label htmlFor="useCase">Enter Use Case:</label>
-        <input
-          type="text"
-          id="useCase"
-          value={useCase}
-          onChange={(e) => setUseCase(e.target.value)}
-          placeholder="Describe your use case..."
-        />
-      </div>
 
-      <h2>Selected Workflow</h2>
 
-      <div className="workflow">
-        {workflow.map((job, index) => (
-          <div key={`${job.name}-${index}`} className="workflow-box">
-            {job.name}
-            <button
-              className="delete-button"
-              onClick={() => toggleTechnologyInWorkflow(job.name)}
-            >
-              🗑️
-            </button>
-          </div>
-        ))}
-      </div>
-
+{/* Wrapper for Selected Workflow & Optimal Workflow Order */}
+<div className="workflow-container">
+  {/* Selected Workflow Section */}
+  <div className="selected-workflow">
+    <h2>Selected Workflow</h2>
+    <div className="workflow">
+      {workflow.map((job, index) => (
+        <div key={`${job.name}-${index}`} className="workflow-box">
+          {job.name}
+          <button className="delete-button" onClick={() => toggleTechnologyInWorkflow(job.name)}>
+          ❌
+          </button>
+        </div>
+      ))}
       {workflow.length > 0 && useCase && (
         <>
           <button className="generate-button" onClick={generateWorkflowOrder}
@@ -169,39 +209,60 @@ function App() {
           
         </>
       )}
-      {/* Display the optimal workflow order */}
-{optimalOrder && (
-  <div className="optimal-workflow">
-    <h2>Optimal Workflow Order</h2>
-    <ul>
-      {optimalOrder.map((job, index) => (
-        <li key={index}>{job}</li>
-      ))}
-    </ul>
-    <button className="save-button" onClick={saveWorkflowToBackend}>
-            Save Workflow
-          </button>
+    </div>
+  </div>
+
+  {/* Optimal Workflow Order Section */}
+  {optimalOrder && (
+    <div className="optimal-workflow">
+      <h2>Optimal Workflow Order</h2>
+      <ul>
+        {optimalOrder.map((job, index) => (
+          <li key={index}>{job}</li>
+        ))}
+      </ul>
+      <button className="save-button" onClick={saveWorkflowToBackend}>
+        Save Workflow
+      </button>
+      <button className="save-button" onClick={generateNarrative}>
+        Generate Workflow and Narrative
+      </button>
+      {/* Download button for JSON output */}
+{savedJSON && (
+  <button className="download-button" onClick={downloadWorkflowAsJSON}>
+    Download Workflow as JSON
+  </button>
+)}
+    </div>
+  )}
+</div>
+
+
+
+
+{/* Display status messages */}
+{status && <div className="status-message">{status}</div>}
+
+{/* Side-by-side view for JSON and Narrative */}
+{savedJSON && narrative && (
+  <div className="output-container">
+    {/* Workflow in JSON Box */}
+    <div className="json-display">
+      <h3>Workflow in JSON</h3>
+      <pre>{JSON.stringify(savedJSON, null, 2)}</pre>
+    </div>
+
+    {/* Workflow Narrative Box */}
+    <div className="narrative-display">
+      <h3>Workflow Narrative</h3>
+      <div dangerouslySetInnerHTML={{ __html: marked(narrative) }} />
+    </div>
   </div>
 )}
 
-
-
-      {savedJSON && (
-        <button className="download-button" onClick={downloadWorkflowAsJSON}>
-          Download Workflow as JSON
-        </button>
-      )}
-
-      {status && <div className="status-message">{status}</div>}
-
-      {savedJSON && (
-        <div className="json-display">
-          <h3>Workflow in JSON</h3>
-          <pre>{JSON.stringify(savedJSON, null, 2)}</pre>
-        </div>
-      )}
+</div>
     </div>
-    </div>
+
   );
 }
 
