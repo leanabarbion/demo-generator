@@ -64,25 +64,28 @@ def upload_github():
         data = request.json
         workflow_json = json.dumps(data.get("workflow_json", {}), indent=2)
         narrative_text = data.get("narrative_text", "")
+        user_code = data.get("user_info", "unknown_user")
 
         if not workflow_json or not narrative_text:
             return jsonify({"error": "Missing workflow or narrative"}), 400
 
         # Generate a unique folder name (Timestamp format: YYYY-MM-DD_HH-MM-SS)
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        folder_name = f"{BASE_FOLDER_PATH}/workflow_{timestamp}"  # e.g., jobs/workflow_2025-02-11_13-45-30
+        # folder_name = f"{BASE_FOLDER_PATH}/workflow_{timestamp}"  # e.g., jobs/workflow_2025-02-11_13-45-30
+        folder_name = f"{BASE_FOLDER_PATH}/{user_code}_workflow_{timestamp}"
 
-        # Define file paths inside this unique folder
-        workflow_file = f"{folder_name}/workflow.json"
-        narrative_file = f"{folder_name}/narrative.txt"
-        metadata_file = f"{folder_name}/metadata.txt"  # Optional metadata file
+
+        # Define file paths inside this user-specific folder
+        workflow_file = f"{folder_name}/{user_code}_workflow.json"
+        narrative_file = f"{folder_name}/{user_code}_narrative.txt"
+        metadata_file = f"{folder_name}/{user_code}_metadata.txt"
 
         # Upload both files
         upload_workflow = upload_to_github(workflow_file, workflow_json, "Added workflow JSON")
         upload_narrative = upload_to_github(narrative_file, narrative_text, "Added workflow narrative")
 
         # Optional: Upload metadata (user info, timestamp, etc.)
-        metadata_content = f"Upload Time: {timestamp}\nUser Info: {data.get('user_info', 'N/A')}"
+        metadata_content = f"Upload Time: {timestamp}\nUser Code: {user_code}"
         upload_metadata = upload_to_github(metadata_file, metadata_content, "Added metadata")
 
 

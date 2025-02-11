@@ -179,25 +179,27 @@ function App() {
         body: JSON.stringify({
           workflow_json: savedJSON,
           narrative_text: narrative,
-          user_info: "userCode",
+          user_info: userCode?.trim() || "unknown_user",
         }),
       });
 
       const data = await response.json();
 
       if (
-        data.workflow.status === "success" &&
-        data.narrative.status === "success"
+        data.workflow?.status === "success" &&
+        data.narrative?.status === "success"
       ) {
-        alert("Workflow and Narrative uploaded to GitHub successfully!");
+        setStatus("Workflow and Narrative uploaded to GitHub successfully!");
       } else {
-        alert("Upload failed. Check console for details.");
+        setStatus("Upload failed. Check console for details.");
         console.error("Upload Error:", data);
       }
     } catch (error) {
       console.error("Error uploading to GitHub:", error);
-      alert("An error occurred while uploading.");
+      setStatus("An error occurred while uploading.");
     }
+
+    setTimeout(() => setStatus(null), 3000);
   };
 
   return (
