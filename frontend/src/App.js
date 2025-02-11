@@ -12,11 +12,14 @@ function App() {
   const [narrative, setNarrative] = useState(""); // Store the generated narrative
   const [isPanelOpen, setIsPanelOpen] = useState(false); // Control panel visibility
   const [userCode, setUserCode] = useState(""); // Store the user code
+  const [isWorkflowSaved, setIsWorkflowSaved] = useState(false);
+  const [isNarrativeGenerated, setIsNarrativeGenerated] = useState(false);
 
   // Add or remove technologies from the workflow
   const toggleTechnologyInWorkflow = (techName) => {
     if (!userCode.trim()) {
       setStatus("Please enter your User Code before selecting technologies.");
+      setTimeout(() => setStatus(null), 3000);
       return;
     }
 
@@ -81,6 +84,7 @@ function App() {
   const generateNarrative = async () => {
     if (!optimalOrder || workflow.length === 0 || !useCase.trim()) {
       setStatus("Please generate the workflow order first.");
+      setTimeout(() => setStatus(null), 5000);
       return;
     }
     setStatus("Generating workflow and narrative...");
@@ -104,6 +108,7 @@ function App() {
       setNarrative(data.narrative);
       setIsPanelOpen(true); // Open the side panel
       setStatus(null);
+      setIsNarrativeGenerated(true);
     } catch (error) {
       console.error("Error generating narrative:", error);
       setStatus("Error generating narrative. Please try again.");
@@ -135,12 +140,13 @@ function App() {
       console.log("Server Response:", data);
       setSavedJSON(data);
       setStatus("Workflow saved successfully!");
+      setIsWorkflowSaved(true);
     } catch (error) {
       console.error("Error saving workflow:", error);
       setStatus("Error saving workflow. Please try again.");
     }
 
-    setTimeout(() => setStatus(null), 30000); // Automatically clear the status message after 30 seconds
+    setTimeout(() => setStatus(null), 3000); // Automatically clear the status message after 30 seconds
   };
 
   // Download the workflow as a JSON file
@@ -155,6 +161,45 @@ function App() {
     link.click();
     document.body.removeChild(link);
   };
+
+  const uploadWorkflowToGitHub = async () => {
+    if (!savedJSON || !narrative) {
+      setStatus("No workflow or narrative to upload!");
+      return;
+    }
+
+    setStatus("Uploading workflow to GitHub...");
+
+    try {
+      const response = await fetch("http://localhost:5000/upload-github", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          workflow_json: savedJSON,
+          narrative_text: narrative,
+          user_info: "userCode",
+        }),
+      });
+
+      const data = await response.json();
+
+      if (
+        data.workflow.status === "success" &&
+        data.narrative.status === "success"
+      ) {
+        alert("Workflow and Narrative uploaded to GitHub successfully!");
+      } else {
+        alert("Upload failed. Check console for details.");
+        console.error("Upload Error:", data);
+      }
+    } catch (error) {
+      console.error("Error uploading to GitHub:", error);
+      alert("An error occurred while uploading.");
+    }
+  };
+
   return (
     <div className={`app ${isPanelOpen ? "panel-open" : ""}`}>
       {/* Header Section (Title & User Code Input) */}
@@ -242,16 +287,26 @@ function App() {
                 <button className="save-button" onClick={saveWorkflowToBackend}>
                   Save Workflow
                 </button>
-                <button className="save-button" onClick={generateNarrative}>
-                  Generate Workflow and Narrative
-                </button>
-                {savedJSON && (
-                  <button
-                    className="download-button"
-                    onClick={downloadWorkflowAsJSON}
-                  >
-                    Download Workflow as JSON
+                {isWorkflowSaved && (
+                  <button className="save-button" onClick={generateNarrative}>
+                    Generate Workflow and Narrative
                   </button>
+                )}
+                {savedJSON && isNarrativeGenerated && (
+                  <div className="workflow-actions">
+                    <button
+                      className="download-button"
+                      onClick={downloadWorkflowAsJSON}
+                    >
+                      Download Workflow as JSON
+                    </button>
+                    <button
+                      className="upload-button"
+                      onClick={uploadWorkflowToGitHub}
+                    >
+                      Upload Workflow on GitHub
+                    </button>
+                  </div>
                 )}
               </div>
             )}

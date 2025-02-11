@@ -5,6 +5,9 @@ from flask import Flask, request, jsonify, Response
 import json
 from flask_cors import CORS
 import jobs
+import base64
+import requests
+from datetime import datetime
 
 # Load environment variables from .env file
 load_dotenv()
@@ -17,6 +20,78 @@ client = OpenAI(api_key=openai_api_key)
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
+
+# GitHub Config (store token securely in .env)
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+REPO_OWNER = "leanabarbion"
+REPO_NAME = "workflow-repo"  # Replace with your repo name
+BRANCH = "main"
+BASE_FOLDER_PATH = "jobs"# Folder where files will be uploaded
+
+def upload_to_github(file_path, content, message):
+    """Uploads a file to GitHub repository using GitHub API."""
+    url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{file_path}"
+    
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Content-Type": "application/json",
+    }
+
+    # Get the SHA if the file exists (needed for updates)
+    response = requests.get(url, headers=headers)
+    print("GitHub Response:", response.json()) 
+    sha = response.json().get("sha") if response.status_code == 200 else None
+
+    data = {
+        "message": message,
+        "content": base64.b64encode(content.encode()).decode(),
+        "branch": BRANCH,
+    }
+    if sha:
+        data["sha"] = sha  # Required for updates
+
+    upload_response = requests.put(url, headers=headers, data=json.dumps(data))
+    
+    if upload_response.status_code in [200, 201]:
+        return {"status": "success", "file": file_path}
+    else:
+        return {"status": "error", "message": upload_response.json()}
+
+@app.route("/upload-github", methods=["POST"])
+def upload_github():
+    """Endpoint to upload workflow and narrative files to GitHub."""
+    try:
+        data = request.json
+        workflow_json = json.dumps(data.get("workflow_json", {}), indent=2)
+        narrative_text = data.get("narrative_text", "")
+
+        if not workflow_json or not narrative_text:
+            return jsonify({"error": "Missing workflow or narrative"}), 400
+
+        # Generate a unique folder name (Timestamp format: YYYY-MM-DD_HH-MM-SS)
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        folder_name = f"{BASE_FOLDER_PATH}/workflow_{timestamp}"  # e.g., jobs/workflow_2025-02-11_13-45-30
+
+        # Define file paths inside this unique folder
+        workflow_file = f"{folder_name}/workflow.json"
+        narrative_file = f"{folder_name}/narrative.txt"
+        metadata_file = f"{folder_name}/metadata.txt"  # Optional metadata file
+
+        # Upload both files
+        upload_workflow = upload_to_github(workflow_file, workflow_json, "Added workflow JSON")
+        upload_narrative = upload_to_github(narrative_file, narrative_text, "Added workflow narrative")
+
+        # Optional: Upload metadata (user info, timestamp, etc.)
+        metadata_content = f"Upload Time: {timestamp}\nUser Info: {data.get('user_info', 'N/A')}"
+        upload_metadata = upload_to_github(metadata_file, metadata_content, "Added metadata")
+
+
+        return jsonify({"workflow": upload_workflow, "narrative": upload_narrative, "metadata": upload_metadata}), 200
+        
+
+    except Exception as e:
+        print("ERROR:", str(e))
+        return jsonify({"error": str(e)}), 500
 
 def extract_json_from_response(response_content):
     """
@@ -232,15 +307,20 @@ def generate_narrative():
     **Optimized Workflow Order:**  
     {ordered_workflow}  
 
+    **Use Case:**
+    {use_case}
+
     **Generate a structured, fluid narrative following this format:**
 
     ---
+    **Company Type & Industry:**  
+    - Extract the relevant details from the **use case** to personalize the response. Clearly state what kind of company it is based on the use case(e.g., financial institution, healthcare provider, e-commerce business, logistics company).  
     
-    **Business Challenges**  
-    Start by summarizing the key business challenges the company is facing, focusing on **operational inefficiencies, integration complexities, data management hurdles, or compliance risks**. Frame these challenges in a way that sets the stage for why an optimized workflow is needed.  
+    **Negative Outcomes** 
+    (Risks of Not Using Control-M) Describe the potential operational inefficiencies, integration bottlenecks, data inconsistencies, compliance risks, and business disruptions that may arise if the company does not implement Control-M. Emphasize the impact on manual workload, increased errors, missed SLAs, lack of visibility, and higher operational costs. Frame these risks in a way that highlights the urgency of adopting an optimized workflow.
 
-    **Positive Business Outcomes**  
-    Clearly articulate what the company aims to achieve. Describe the key improvements in **efficiency, automation, data reliability, customer experience, or compliance** that they want as a result of implementing an optimized workflow.  
+    **Positive Outcomes** 
+    (Benefits of Implementing Control-M)Clearly outline the tangible business benefits the company stands to gain by adopting Control-M. Highlight improvements in workflow automation, SLA adherence, error reduction, real-time monitoring, and seamless integration across systems. Explain how this leads to increased efficiency, enhanced customer experience, improved compliance, and reduced operational overhead.
 
     **Optimized Workflow Recommendation**  
     Transition into explaining the **ideal workflow structure** based on the provided technologies.  
