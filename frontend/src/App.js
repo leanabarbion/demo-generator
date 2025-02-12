@@ -14,6 +14,8 @@ function App() {
   const [userCode, setUserCode] = useState(""); // Store the user code
   const [isWorkflowSaved, setIsWorkflowSaved] = useState(false);
   const [isNarrativeGenerated, setIsNarrativeGenerated] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState(null);
+  const [isJsonUploaded, setIsJsonUploaded] = useState(false);
 
   // Add or remove technologies from the workflow
   const toggleTechnologyInWorkflow = (techName) => {
@@ -22,6 +24,7 @@ function App() {
       setTimeout(() => setStatus(null), 3000);
       return;
     }
+    setIsJsonUploaded(false);
 
     if (workflow.find((job) => job.name === techName)) {
       setWorkflow(workflow.filter((job) => job.name !== techName));
@@ -146,7 +149,7 @@ function App() {
       setStatus("Error saving workflow. Please try again.");
     }
 
-    setTimeout(() => setStatus(null), 3000); // Automatically clear the status message after 30 seconds
+    setTimeout(() => setStatus(null), 3000); // Automatically clear the status message after 3 seconds
   };
 
   // Download the workflow as a JSON file
@@ -202,6 +205,46 @@ function App() {
     setTimeout(() => setStatus(null), 3000);
   };
 
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+    processJsonFile(file);
+  };
+
+  const handleDrop = (event) => {
+    event.preventDefault();
+    const file = event.dataTransfer.files[0];
+    processJsonFile(file);
+  };
+
+  const processJsonFile = (file) => {
+    if (!file) return;
+
+    setUploadedFileName(file.name); // Display file name
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const jsonData = JSON.parse(e.target.result);
+
+        if (!jsonData.technologies || !Array.isArray(jsonData.technologies)) {
+          setStatus("Invalid JSON format. Expected an array of technologies.");
+          setTimeout(() => setStatus(null), 30000);
+          return;
+        }
+
+        // Disable manual selection, update workflow from JSON
+        setWorkflow(jsonData.technologies.map((tech) => ({ name: tech })));
+        setStatus("Workflow successfully loaded from JSON.");
+        setTimeout(() => setStatus(null), 30000);
+      } catch (error) {
+        console.error("Error parsing JSON:", error);
+        setStatus("Error reading JSON file. Ensure it is properly formatted.");
+        setTimeout(() => setStatus(null), 30000);
+      }
+    };
+    reader.readAsText(file);
+  };
+
   return (
     <div className={`app ${isPanelOpen ? "panel-open" : ""}`}>
       {/* Header Section (Title & User Code Input) */}
@@ -210,7 +253,7 @@ function App() {
           <div className="header-container">
             <h1>Demonstration Generator</h1>
             <div className="user-code-container">
-              <label htmlFor="userCode">Enter User Code:</label>
+              <h3 htmlFor="userCode">Enter User Code:</h3>
               <input
                 type="text"
                 id="userCode"
@@ -220,21 +263,8 @@ function App() {
               />
             </div>
           </div>
-
-          {/* Main Content Section (FIX: Both Left & Right columns inside content-container) */}
-          <h3>Select your technologies and enter your use case:</h3>
-          <TechnologyGrid
-            selectedIcons={workflow.map((job) => job.name)}
-            onToggle={toggleTechnologyInWorkflow}
-            disabled={!userCode.trim()} // Disable selection if user code is empty
-          />
-        </div>
-
-        {/* Right Column - Use Case & Workflow */}
-        <div className="right-column">
-          {/* Use Case Input */}
           <div className="use-case-input">
-            <label htmlFor="useCase">Enter Use Case:</label>
+            <h3 htmlFor="useCase">Enter Use Case:</h3>
             <textarea
               id="useCase"
               value={useCase}
@@ -248,71 +278,103 @@ function App() {
             />
           </div>
 
-          {/* Workflow Sections */}
-          <div className="workflow-container">
-            {/* Selected Workflow */}
-            <div className="selected-workflow">
-              <h2>Selected Workflow</h2>
-              <div className="workflow">
-                {workflow.map((job, index) => (
-                  <div key={`${job.name}-${index}`} className="workflow-box">
-                    {job.name}
-                    <button
-                      className="delete-button"
-                      onClick={() => toggleTechnologyInWorkflow(job.name)}
-                    >
-                      ❌
-                    </button>
-                  </div>
-                ))}
-                {workflow.length > 0 && useCase && (
-                  <button
-                    className="generate-button"
-                    onClick={generateWorkflowOrder}
-                    disabled={workflow.length === 0 || !useCase.trim()}
-                  >
-                    Generate Optimal Order
-                  </button>
-                )}
-              </div>
-            </div>
+          {/* Main Content Section (FIX: Both Left & Right columns inside content-container) */}
+          <h3>Select your technologies:</h3>
+          <TechnologyGrid
+            selectedIcons={workflow.map((job) => job.name)}
+            onToggle={toggleTechnologyInWorkflow}
+            disabled={!userCode.trim()} // Disable selection if user code is empty
+          />
+        </div>
 
-            {/* Optimal Workflow Order */}
-            {optimalOrder && (
-              <div className="optimal-workflow">
-                <h2>Optimal Workflow Order</h2>
-                <ul>
-                  {optimalOrder.map((job, index) => (
-                    <li key={index}>{job}</li>
-                  ))}
-                </ul>
-                <button className="save-button" onClick={saveWorkflowToBackend}>
-                  Save Workflow
-                </button>
-                {isWorkflowSaved && (
-                  <button className="save-button" onClick={generateNarrative}>
-                    Generate Workflow and Narrative
-                  </button>
-                )}
-                {savedJSON && isNarrativeGenerated && (
-                  <div className="workflow-actions">
-                    <button
-                      className="download-button"
-                      onClick={downloadWorkflowAsJSON}
-                    >
-                      Download Workflow as JSON
-                    </button>
-                    <button
-                      className="upload-button"
-                      onClick={uploadWorkflowToGitHub}
-                    >
-                      Upload Workflow on GitHub
-                    </button>
-                  </div>
-                )}
+        {/* Right Column - Use Case & Workflow */}
+        <div className="right-column">
+          {/* Upload JSON Section */}
+          {!isJsonUploaded && workflow.length === 0 && (
+            <div className="upload-section">
+              <h3>Or Upload a JSON File:</h3>
+              <div
+                className="drop-zone"
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={handleDrop}
+              >
+                Drag & Drop JSON File Here or
+                <input type="file" accept=".json" onChange={handleFileUpload} />
               </div>
-            )}
-          </div>
+              {uploadedFileName && <p>Uploaded File: {uploadedFileName}</p>}
+            </div>
+          )}
+
+          {/* Workflow Sections */}
+          {workflow.length > 0 && (
+            <div className="workflow-container">
+              {/* Selected Workflow */}
+              <div className="selected-workflow">
+                <h2>Selected Workflow</h2>
+                <div className="workflow">
+                  {workflow.map((job, index) => (
+                    <div key={`${job.name}-${index}`} className="workflow-box">
+                      {job.name}
+                      <button
+                        className="delete-button"
+                        onClick={() => toggleTechnologyInWorkflow(job.name)}
+                      >
+                        ❌
+                      </button>
+                    </div>
+                  ))}
+                  {workflow.length > 0 && useCase && (
+                    <button
+                      className="generate-button"
+                      onClick={generateWorkflowOrder}
+                      disabled={workflow.length === 0 || !useCase.trim()}
+                    >
+                      Generate Optimal Order
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Optimal Workflow Order */}
+              {optimalOrder && (
+                <div className="optimal-workflow">
+                  <h2>Optimal Workflow Order</h2>
+                  <ul>
+                    {optimalOrder.map((job, index) => (
+                      <li key={index}>{job}</li>
+                    ))}
+                  </ul>
+                  <button
+                    className="save-button"
+                    onClick={saveWorkflowToBackend}
+                  >
+                    Save Workflow
+                  </button>
+                  {isWorkflowSaved && (
+                    <button className="save-button" onClick={generateNarrative}>
+                      Generate Workflow and Narrative
+                    </button>
+                  )}
+                  {savedJSON && isNarrativeGenerated && (
+                    <div className="workflow-actions">
+                      <button
+                        className="download-button"
+                        onClick={downloadWorkflowAsJSON}
+                      >
+                        Download Workflow as JSON
+                      </button>
+                      <button
+                        className="upload-button"
+                        onClick={uploadWorkflowToGitHub}
+                      >
+                        Upload Workflow on GitHub
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Display status messages */}
           {status && <div className="status-message">{status}</div>}

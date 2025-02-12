@@ -44,11 +44,13 @@ h1 {
 /* Use Case Input */
 .use-case-input {
   margin: 20px 0;
+  width: 93.2%;
 }
 
 .use-case-input label {
   font-size: 16px;
   font-weight: bold;
+  display: block;
 }
 
 .use-case-input input {
@@ -345,4 +347,27 @@ button:hover {
 
 .upload-button:hover {
   background-color: #333;
+}
+.upload-section {
+  background-color: #f8f9fa;
+  padding: 15px;
+  border: 2px dashed #ccc;
+  text-align: center;
+  border-radius: 10px;
+  margin-bottom: 20px;
+}
+
+.drop-zone {
+  cursor: pointer;
+  padding: 15px;
+  font-size: 14px;
+}
+
+.drop-zone:hover {
+  background-color: #e9ecef;
+}
+
+input[type="file"] {
+  display: block;
+  margin: 10px auto;
 }
