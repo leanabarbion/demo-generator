@@ -207,6 +207,14 @@ function App() {
 
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
+
+    if (!file) {
+      console.log("❌ No file detected.");
+      return;
+    }
+
+    console.log("📂 File selected:", file.name);
+
     processJsonFile(file);
   };
 
@@ -222,24 +230,66 @@ function App() {
     setUploadedFileName(file.name); // Display file name
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const jsonData = JSON.parse(e.target.result);
 
-        if (!jsonData.technologies || !Array.isArray(jsonData.technologies)) {
-          setStatus("Invalid JSON format. Expected an array of technologies.");
-          setTimeout(() => setStatus(null), 30000);
+        // To eventually update to the user code given etc
+        if (
+          !jsonData.WZA_DEMO_GEN ||
+          typeof jsonData.WZA_DEMO_GEN !== "object"
+        ) {
+          console.error("❌ Invalid JSON structure.");
+          setStatus(
+            "Invalid JSON format. Expected a Control-M workflow structure."
+          );
           return;
         }
 
-        // Disable manual selection, update workflow from JSON
-        setWorkflow(jsonData.technologies.map((tech) => ({ name: tech })));
-        setStatus("Workflow successfully loaded from JSON.");
-        setTimeout(() => setStatus(null), 30000);
+        console.log("Uploading JSON to Backend:", jsonData);
+
+        // Extract job names from the Control-M JSON structure
+        const jobNames = Object.keys(jsonData.WZA_DEMO_GEN).filter(
+          (key) => key.startsWith("Run") // Only extract job names
+        );
+
+        if (jobNames.length === 0) {
+          console.error("❌ No technologies found in JSON.");
+          setStatus("No technologies found in the uploaded JSON.");
+          return;
+        }
+
+        console.log("📋 Extracted Job Names:", jobNames);
+
+        // Send JSON to backend for validation and processing
+        const response = await fetch(
+          "http://localhost:5000/upload-workflow-json",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ jobs: jobNames }),
+          }
+        );
+
+        const result = await response.json();
+
+        console.log("Backend Response:", result);
+
+        if (response.ok) {
+          setWorkflow(result.workflow.map((tech) => ({ name: tech }))); // Update UI workflow
+          setIsJsonUploaded(true);
+          setStatus("Workflow successfully loaded from JSON.");
+        } else {
+          setStatus(result.error || "Failed to process JSON file.");
+        }
+
+        setTimeout(() => setStatus(null), 3000);
       } catch (error) {
         console.error("Error parsing JSON:", error);
         setStatus("Error reading JSON file. Ensure it is properly formatted.");
-        setTimeout(() => setStatus(null), 30000);
+        setTimeout(() => setStatus(null), 3000);
       }
     };
     reader.readAsText(file);
@@ -294,12 +344,20 @@ function App() {
             <div className="upload-section">
               <h3>Or Upload a JSON File:</h3>
               <div
-                className="drop-zone"
+                className="drop-area"
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleDrop}
               >
                 Drag & Drop JSON File Here or
-                <input type="file" accept=".json" onChange={handleFileUpload} />
+                <label className="upload-label">
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={handleFileUpload}
+                    style={{ display: "none" }}
+                  />
+                  <span className="upload-button">Browse File</span>
+                </label>
               </div>
               {uploadedFileName && <p>Uploaded File: {uploadedFileName}</p>}
             </div>

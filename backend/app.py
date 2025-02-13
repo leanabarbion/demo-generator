@@ -351,6 +351,29 @@ def generate_narrative():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/upload-workflow-json", methods=["POST"])
+def upload_workflow_json():
+    """
+    Extract job names from an uploaded Control-M workflow JSON and return them
+    """
+    try:
+        data = request.get_json()  # Assuming the JSON is sent as raw JSON in the request
+        app.logger.info(f"📩 Received JSON: {json.dumps(data, indent=2)}")  # Debug log     
+
+        if not data or "jobs" not in data:
+            return jsonify({"error": "Invalid JSON format. Expected a list of jobs."}), 400
+
+        job_names = data["jobs"] 
+
+        if not isinstance(job_names, list) or len(job_names) == 0:
+            return jsonify({"error": "No valid jobs found in JSON."}), 400
+
+        return jsonify({"workflow": job_names}), 200
+
+    except Exception as e:
+        app.logger.error(f"Error processing JSON upload: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
 
 if __name__ == "__main__":
     app.run(debug=True)
