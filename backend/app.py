@@ -262,19 +262,19 @@ def save_workflow():
     "SAP Data Archiving": ("Run SAP Data Archiving job", "SAP_Data_Archiving"),
 }
 
-        # Validate jobs against mapping
-        missing_jobs = []
-        for job_name in workflow:
-            if job_name not in job_function_mapping:
-                missing_jobs.append(job_name)
+        # ✅ Remove "Run " prefix from job names
+        normalized_workflow = [job.replace("Run ", "").replace(" job", "").strip() for job in workflow]
 
+        # ✅ Check for missing jobs
+        missing_jobs = [job for job in normalized_workflow if job not in job_function_mapping]
+        
         if missing_jobs:
             app.logger.error(f"❌ Unknown Jobs Found: {missing_jobs}")
             return jsonify({"error": f"Unknown Job Names: {missing_jobs}"}), 400
         
 
         # Dynamically add jobs to the response data based on the ordered workflow received
-        for job_name in data['workflow']:
+        for job_name in normalized_workflow:
           if job_name in job_function_mapping:
             descriptive_key, function_name = job_function_mapping[job_name]
             job_function = getattr(jobs, function_name, None)
@@ -389,12 +389,17 @@ def upload_workflow_json():
         if not data or "jobs" not in data:
             return jsonify({"error": "Invalid JSON format. Expected a list of jobs."}), 400
 
-        job_names = data["jobs"] 
+         # ✅ Extract only the job name (remove "Run " prefix and " job" suffix)
+        extracted_job_names = [
+            job.replace("Run ", "").replace(" job", "").strip() for job in data["jobs"]
+        ]
 
-        if not isinstance(job_names, list) or len(job_names) == 0:
+        if not extracted_job_names:
             return jsonify({"error": "No valid jobs found in JSON."}), 400
 
-        return jsonify({"workflow": job_names}), 200
+        app.logger.info(f"📋 Extracted Job Names: {extracted_job_names}")  
+
+        return jsonify({"workflow": extracted_job_names}), 200
 
     except Exception as e:
         app.logger.error(f"Error processing JSON upload: {str(e)}")
