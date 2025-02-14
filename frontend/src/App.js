@@ -85,8 +85,8 @@ function App() {
   };
 
   const generateNarrative = async () => {
-    if (!optimalOrder || workflow.length === 0 || !useCase.trim()) {
-      setStatus("Please generate the workflow order first.");
+    if (workflow.length === 0 || !useCase.trim()) {
+      setStatus("Enter Use Case first. ");
       setTimeout(() => setStatus(null), 5000);
       return;
     }
@@ -102,14 +102,13 @@ function App() {
         body: JSON.stringify({
           technologies: workflow.map((job) => job.name),
           use_case: useCase,
-          optimal_order: optimalOrder,
+          optimal_order: optimalOrder || workflow.map((job) => job.name),
         }),
       });
 
       if (!response.ok) throw new Error("Failed to generate narrative.");
       const data = await response.json();
       setNarrative(data.narrative);
-      setIsPanelOpen(true); // Open the side panel
       setStatus(null);
       setIsNarrativeGenerated(true);
     } catch (error) {
@@ -122,9 +121,24 @@ function App() {
   const saveWorkflowToBackend = async () => {
     setStatus("Saving workflow...");
 
+    // Log both workflow and optimal order before sending request
+    console.log("🟢 Saving Workflow...");
+    console.log(
+      "✅ Selected Technologies:",
+      workflow.map((job) => job.name)
+    );
+    console.log("🔵 Optimal Order:", optimalOrder);
+
     try {
+      // If optimal order exists, use it. Otherwise, use selected technologies.
+      let finalWorkflow = optimalOrder?.length
+        ? optimalOrder
+        : workflow.map((job) => job.name);
+
       // Convert the workflow to an array of strings (job names)
-      const formattedWorkflow = workflow.map((job) => job.name);
+      // const formattedWorkflow = workflow.map((job) => job.name);
+
+      console.log("🚀 Final Workflow Sent to Backend:", finalWorkflow);
 
       const response = await fetch("http://localhost:5000/save-workflow", {
         method: "POST",
@@ -132,7 +146,7 @@ function App() {
           "Content-Type": "application/json",
           Accept: "application/json",
         },
-        body: JSON.stringify({ workflow: formattedWorkflow }),
+        body: JSON.stringify({ workflow: finalWorkflow }),
       });
 
       if (!response.ok) {
@@ -314,7 +328,7 @@ function App() {
             </div>
           </div>
           <div className="use-case-input">
-            <h3 htmlFor="useCase">Enter Use Case:</h3>
+            <h3 htmlFor="useCase">Enter Use Case to Save Workflow:</h3>
             <textarea
               id="useCase"
               value={useCase}
@@ -382,13 +396,47 @@ function App() {
                     </div>
                   ))}
                   {workflow.length > 0 && useCase && (
-                    <button
-                      className="generate-button"
-                      onClick={generateWorkflowOrder}
-                      disabled={workflow.length === 0 || !useCase.trim()}
-                    >
-                      Generate Optimal Order
-                    </button>
+                    <div className="workflow-buttons">
+                      <button
+                        className="generate-button"
+                        onClick={generateWorkflowOrder}
+                        disabled={workflow.length === 0 || !useCase.trim()}
+                      >
+                        Generate Optimal Order
+                      </button>
+
+                      <button
+                        className="save-button"
+                        onClick={saveWorkflowToBackend}
+                        disabled={workflow.length === 0 || !useCase.trim()}
+                      >
+                        Save Workflow
+                      </button>
+                      {isWorkflowSaved && (
+                        <button
+                          className="save-button"
+                          onClick={generateNarrative}
+                        >
+                          Generate Workflow and Narrative
+                        </button>
+                      )}
+                      {savedJSON && isNarrativeGenerated && (
+                        <div className="workflow-actions">
+                          <button
+                            className="download-button"
+                            onClick={downloadWorkflowAsJSON}
+                          >
+                            Download Workflow as JSON
+                          </button>
+                          <button
+                            className="upload-button"
+                            onClick={uploadWorkflowToGitHub}
+                          >
+                            Upload Workflow on GitHub
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>

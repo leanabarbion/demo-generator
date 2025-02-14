@@ -118,6 +118,8 @@ def generate():
     """
     try:
         data = request.json
+        app.logger.info(f"Received Data: {json.dumps(data, indent=2)}")  # Debugging log
+
         print("Received Data:", data)  # Add this for debugging
 
         technologies = data.get("technologies")
@@ -142,16 +144,18 @@ def generate():
         )
 
         response_content = completion.choices[0].message.content.strip()
+        app.logger.info(f"GPT Response: {response_content}")  # Debugging log
+
         ordered_workflow = extract_json_from_response(response_content)
 
         if ordered_workflow:
           response = {"optimal_order": ordered_workflow.get("workflow_order") or ordered_workflow.get("workflow")}
-          app.logger.info(f"Optimal Workflow Order: {json.dumps(response, indent=2)}")
-          return jsonify(response), 200
-
         else:
-            return jsonify({"error": "Failed to extract ordered workflow", "raw_response": response_content}), 500
-
+          response = {"optimal_order": technologies} 
+    
+        app.logger.info(f"Optimal Workflow Order: {json.dumps(response, indent=2)}")
+        return jsonify(response), 200
+        
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -162,12 +166,17 @@ def save_workflow():
     """
     try: 
         data = request.get_json()
-        app.logger.info(f"Received Data: {data}")  # Log the received data
+        app.logger.info(f"📩 Received Data: {json.dumps(data, indent=2)}")
 
         if not data or 'workflow' not in data:
             return jsonify({"error": "Invalid data"}), 400
+        
+        workflow = data["workflow"]
+        app.logger.info(f"✅ Workflow to be saved: {workflow}")  # Ensure correct workflow received
+
 
         response_data = {"WZA_DEMO_GEN": {"Type": "Folder", "ControlmServer": "Sandbox", "OrderMethod": "Manual"}}
+
 
         # Job function mapping
         job_function_mapping = {
@@ -253,6 +262,17 @@ def save_workflow():
     "SAP Data Archiving": ("Run SAP Data Archiving job", "SAP_Data_Archiving"),
 }
 
+        # Validate jobs against mapping
+        missing_jobs = []
+        for job_name in workflow:
+            if job_name not in job_function_mapping:
+                missing_jobs.append(job_name)
+
+        if missing_jobs:
+            app.logger.error(f"❌ Unknown Jobs Found: {missing_jobs}")
+            return jsonify({"error": f"Unknown Job Names: {missing_jobs}"}), 400
+        
+
         # Dynamically add jobs to the response data based on the ordered workflow received
         for job_name in data['workflow']:
           if job_name in job_function_mapping:
@@ -280,10 +300,16 @@ def generate_narrative():
         data = request.json
         technologies = data.get("technologies")
         use_case = data.get("use_case")
-        ordered_workflow = data.get("optimal_order")
+        ordered_workflow = data.get("optimal_order") or technologies
 
         if not technologies or not use_case or not ordered_workflow:
             return jsonify({"error": "Technologies, use case, and workflow order are required."}), 400
+        
+        # Debugging logs
+        app.logger.info(f"📝 Generating Narrative with:")
+        app.logger.info(f"Technologies: {technologies}")
+        app.logger.info(f"Use Case: {use_case}")
+        app.logger.info(f"Ordered Workflow: {ordered_workflow}")
 
         # Use OpenAI to generate a narrative
         completion = client.chat.completions.create(
