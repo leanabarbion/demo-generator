@@ -296,7 +296,7 @@ def generate_narrative():
     """
     Generate a narrative explaining the workflow in detail.
     """
-    try:
+    try: 
         data = request.json
         technologies = data.get("technologies")
         use_case = data.get("use_case")
@@ -311,70 +311,80 @@ def generate_narrative():
         app.logger.info(f"Use Case: {use_case}")
         app.logger.info(f"Ordered Workflow: {ordered_workflow}")
 
-        # Use OpenAI to generate a narrative
-        completion = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-    "role": "system",
-    "content": "You are an AI assistant that generates structured, fluid, and engaging narratives explaining optimized workflows for business use cases. Your response should be professional, insightful, and easy to read, avoiding unnecessary repetition of the provided discovery information."
-},
-{
-    "role": "user",
-    "content": f"""
-    The user has provided the following **discovery information**:
+        def generate_stream():
+            try:
 
-    **Business Challenges:**  
-    - Extract the key pain points mentioned in the discovery information.  
+                # Use OpenAI to generate a narrative
+                completion = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[
+                        {
+            "role": "system",
+            "content": "You are an AI assistant that generates structured, fluid, and engaging narratives explaining optimized workflows for business use cases. Your response should be professional, insightful, and easy to read, avoiding unnecessary repetition of the provided discovery information."
+        },
+        {
+            "role": "user",
+            "content": f"""
+            The user has provided the following **discovery information**:
 
-    **Positive Business Outcomes:**  
-    - Identify the main goals and improvements the business aims to achieve.  
+            **Business Challenges:**  
+            - Extract the key pain points mentioned in the discovery information.  
 
-    **Technologies Provided:**  
-    {technologies}  
+            **Positive Business Outcomes:**  
+            - Identify the main goals and improvements the business aims to achieve.  
 
-    **Optimized Workflow Order:**  
-    {ordered_workflow}  
+            **Technologies Provided:**  
+            {technologies}  
 
-    **Use Case:**
-    {use_case}
+            **Optimized Workflow Order:**  
+            {ordered_workflow}  
 
-    **Generate a structured, fluid narrative following this format:**
+            **Use Case:**
+            {use_case}
 
-    ---
-    **Company Type & Industry:**  
-    - Extract the relevant details from the **use case** to personalize the response. Clearly state what kind of company it is based on the use case(e.g., financial institution, healthcare provider, e-commerce business, logistics company).  
-    
-    **Negative Outcomes** 
-    (Risks of Not Using Control-M) Describe the potential operational inefficiencies, integration bottlenecks, data inconsistencies, compliance risks, and business disruptions that may arise if the company does not implement Control-M. Emphasize the impact on manual workload, increased errors, missed SLAs, lack of visibility, and higher operational costs. Frame these risks in a way that highlights the urgency of adopting an optimized workflow.
+            **Generate a structured, fluid narrative following this format:**
 
-    **Positive Outcomes** 
-    (Benefits of Implementing Control-M)Clearly outline the tangible business benefits the company stands to gain by adopting Control-M. Highlight improvements in workflow automation, SLA adherence, error reduction, real-time monitoring, and seamless integration across systems. Explain how this leads to increased efficiency, enhanced customer experience, improved compliance, and reduced operational overhead.
+            ---
+            **Company Type & Industry:**  
+            - Extract the relevant details from the **use case** to personalize the response. Clearly state what kind of company it is based on the use case(e.g., financial institution, healthcare provider, e-commerce business, logistics company).  
+            
+            **Negative Outcomes** 
+            (Risks of Not Using Control-M) Describe the potential operational inefficiencies, integration bottlenecks, data inconsistencies, compliance risks, and business disruptions that may arise if the company does not implement Control-M. Emphasize the impact on manual workload, increased errors, missed SLAs, lack of visibility, and higher operational costs. Frame these risks in a way that highlights the urgency of adopting an optimized workflow.
 
-    **Optimized Workflow Recommendation**  
-    Transition into explaining the **ideal workflow structure** based on the provided technologies.  
+            **Positive Outcomes** 
+            (Benefits of Implementing Control-M)Clearly outline the tangible business benefits the company stands to gain by adopting Control-M. Highlight improvements in workflow automation, SLA adherence, error reduction, real-time monitoring, and seamless integration across systems. Explain how this leads to increased efficiency, enhanced customer experience, improved compliance, and reduced operational overhead.
 
-    **Why This Order?**  
-    Explain the reasoning behind the sequencing of technologies in a **logical and easy-to-follow manner**. Ensure the explanation aligns with how data flows efficiently, dependencies between systems, and how automation ensures a seamless process.  
+            **Optimized Workflow Recommendation**  
+            Transition into explaining the **ideal workflow structure** based on the provided technologies.  
 
-    **Technology Contributions and Key Tasks**  
-    Break down how **each technology in the workflow contributes**, describing the role it plays and the **key tasks** it handles at that stage. This section should read smoothly and transition logically from one step to the next.  
+            **Why This Order?**  
+            Explain the reasoning behind the sequencing of technologies in a **logical and easy-to-follow manner**. Ensure the explanation aligns with how data flows efficiently, dependencies between systems, and how automation ensures a seamless process.  
 
-    **How This Workflow Ensures Efficiency**  
-    Conclude by tying everything together—explain how this workflow improves **scalability, reliability, automation, and business efficiency**. Highlight measurable benefits such as **reduced processing time, higher job success rates, improved visibility, and better decision-making**.  
+            **Technology Contributions and Key Tasks**  
+            Break down how **each technology in the workflow contributes**, describing the role it plays and the **key tasks** it handles at that stage. This section should read smoothly and transition logically from one step to the next.  
 
-    The response should be **fluid, structured, and easy to read**, avoiding redundancy while ensuring a **clear, insightful explanation** that aligns with business priorities.
-    """
-}
+            **How This Workflow Ensures Efficiency**  
+            Conclude by tying everything together—explain how this workflow improves **scalability, reliability, automation, and business efficiency**. Highlight measurable benefits such as **reduced processing time, higher job success rates, improved visibility, and better decision-making**.  
 
-            ]
-        )
+            The response should be **fluid, structured, and easy to read**, avoiding redundancy while ensuring a **clear, insightful explanation** that aligns with business priorities.
+            """
+        }
 
-        narrative_response = completion.choices[0].message.content.strip()
+                    ], stream = True
+                )
+                for chunk in completion:
+                        content = getattr(chunk.choices[0].delta, "content", None)
+                        if content:
+                            yield content
 
-        return jsonify({"narrative": narrative_response}), 200
+            except Exception as e:
+                app.logger.error(f"❌ Error during streaming: {str(e)}")
+                yield json.dumps({"error": str(e)})
+
+        return Response(generate_stream(), content_type="text/plain")
 
     except Exception as e:
+        app.logger.error(f"❌ Error generating narrative: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 @app.route("/upload-workflow-json", methods=["POST"])

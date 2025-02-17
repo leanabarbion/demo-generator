@@ -90,9 +90,15 @@ function App() {
       setTimeout(() => setStatus(null), 5000);
       return;
     }
-    setStatus("Generating workflow and narrative...");
+    setStatus("Saving workflow before generating the narrative...");
 
     try {
+      // First, save the workflow automatically
+      await saveWorkflowToBackend();
+
+      setStatus("Generating workflow and narrative...");
+      setNarrative(""); // Clear the narrative before generating a new one
+
       const response = await fetch("http://localhost:5000/generate-narrative", {
         method: "POST",
         headers: {
@@ -107,14 +113,45 @@ function App() {
       });
 
       if (!response.ok) throw new Error("Failed to generate narrative.");
-      const data = await response.json();
-      setNarrative(data.narrative);
-      setStatus(null);
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let fullNarrative = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        let chunkText = decoder.decode(value, { stream: true });
+
+        chunkText = chunkText.replace(/\n([A-Z][^\n:]+):/g, "\n\n**$1**\n");
+
+        chunkText = chunkText.replace(/\n{3,}/g, "\n\n");
+
+        fullNarrative += chunkText;
+
+        setNarrative(fullNarrative); // ✅ Update UI with cleaned narrative
+      }
+
+      setStatus(null); // ✅ Clear status as soon as the narrative appears
       setIsNarrativeGenerated(true);
     } catch (error) {
       console.error("Error generating narrative:", error);
       setStatus("Error generating narrative. Please try again.");
+      setTimeout(() => setStatus(null), 5000);
     }
+
+    //   if (!response.ok) throw new Error("Failed to generate narrative.");
+    //   const data = await response.json();
+    //   setNarrative(data.narrative);
+    //   setStatus(null);
+    //   setIsNarrativeGenerated(true);
+    //   setTimeout(() => setStatus(null), 2000);
+    // } catch (error) {
+    //   console.error("Error generating narrative:", error);
+    //   setStatus("Error generating narrative. Please try again.");
+    //   setTimeout(() => setStatus(null), 5000);
+    // }
   };
 
   // Save the workflow to the backend
@@ -405,14 +442,7 @@ function App() {
                         Generate Optimal Order
                       </button>
 
-                      <button
-                        className="save-button"
-                        onClick={saveWorkflowToBackend}
-                        disabled={workflow.length === 0 || !useCase.trim()}
-                      >
-                        Save Workflow
-                      </button>
-                      {isWorkflowSaved && (
+                      {workflow.length > 0 && (
                         <button
                           className="save-button"
                           onClick={generateNarrative}
@@ -450,12 +480,7 @@ function App() {
                       <li key={index}>{job}</li>
                     ))}
                   </ul>
-                  <button
-                    className="save-button"
-                    onClick={saveWorkflowToBackend}
-                  >
-                    Save Workflow
-                  </button>
+
                   {isWorkflowSaved && (
                     <button className="save-button" onClick={generateNarrative}>
                       Generate Workflow and Narrative
