@@ -256,27 +256,36 @@ function App() {
     setTimeout(() => setStatus(null), 3000);
   };
 
-  const handleFileUpload = (event) => {
-    const file = event.target.files[0];
+  // const handleFileUpload = (event) => {
+  //   const file = event.target.files[0];
 
-    if (!file) {
-      console.log("❌ No file detected.");
-      return;
-    }
+  //   if (!file) {
+  //     console.log("❌ No file detected.");
+  //     return;
+  //   }
 
-    console.log("📂 File selected:", file.name);
+  //   console.log("📂 File selected:", file.name);
 
-    processJsonFile(file);
-  };
+  //   processJsonFile(file);
+  // };
 
   const handleDrop = (event) => {
     event.preventDefault();
     const file = event.dataTransfer.files[0];
-    processJsonFile(file);
+    if (file) {
+      processJsonFile(file);
+    }
+  };
+
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0]; // Get the uploaded file
+    if (file) {
+      processJsonFile(file);
+    }
   };
 
   const processJsonFile = (file) => {
-    if (!file) return;
+    // if (!file) return;
 
     setUploadedFileName(file.name); // Display file name
 
@@ -399,7 +408,6 @@ function App() {
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleDrop}
               >
-                Drag & Drop JSON File Here or
                 <label className="upload-label">
                   <input
                     type="file"
@@ -481,7 +489,7 @@ function App() {
                     ))}
                   </ul>
 
-                  {isWorkflowSaved && (
+                  {workflow.length > 0 && (
                     <button className="save-button" onClick={generateNarrative}>
                       Generate Workflow and Narrative
                     </button>
