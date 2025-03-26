@@ -1,5 +1,5 @@
 import os
-from openai import OpenAI
+from openai import OpenAI, AzureOpenAI
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify, Response
 import json
@@ -9,14 +9,30 @@ import base64
 import requests
 from datetime import datetime
 
+
+
 # Load environment variables from .env file
 load_dotenv()
 
-# Access the OpenAI API key from environment variables
-openai_api_key = os.getenv("OPENAI_API_KEY")
+# # Access the OpenAI API key from environment variables
+# openai_api_key = os.getenv("Azure_OpenAI")
 
-# Initialize OpenAI client
-client = OpenAI(api_key=openai_api_key)
+# # Initialize OpenAI client
+# client = OpenAI(api_key=openai_api_key)
+
+
+# Load from .env
+azure_openai_key = os.getenv("AZURE_OPENAI_KEY")
+azure_openai_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+azure_openai_api_version = os.getenv("AZURE_OPENAI_API_VERSION")
+azure_openai_deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT")
+
+# Initialize Azure OpenAI client
+client = AzureOpenAI(
+    api_key=azure_openai_key,
+    api_version=azure_openai_api_version,
+    azure_endpoint=azure_openai_endpoint
+)
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
