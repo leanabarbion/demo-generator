@@ -388,10 +388,13 @@ def generate_narrative():
 
                     ], stream = True
                 )
+
                 for chunk in completion:
+                    if chunk.choices and hasattr(chunk.choices[0], "delta"):
                         content = getattr(chunk.choices[0].delta, "content", None)
                         if content:
                             yield content
+ 
 
             except Exception as e:
                 app.logger.error(f"❌ Error during streaming: {str(e)}")
