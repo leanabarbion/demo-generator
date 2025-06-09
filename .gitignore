@@ -21,12 +21,10 @@ package.json
 *.swo
 
 # Project specific
-backend/output.json
-backend/my_secrets.py
-backend/Workspace_*.json
-backend/*.pyc
-backend/__pycache__/
-backend/venv/
-
-# Keep these files
+# Ignore everything in backend
+backend/*
+# Except these specific files
+!backend/app.py
+!backend/simpletestapp.py
 !backend/requirements.txt
+!backend/job_library.py
