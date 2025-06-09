@@ -2,117 +2,79 @@ import React, { useState } from "react";
 import "./App.css";
 import TechnologyGrid from "./TechnologyGrid";
 import { marked } from "marked";
+import { JOB_LIBRARY } from "./jobLibrary";
 
 function App() {
   const [workflow, setWorkflow] = useState([]);
-  const [useCase, setUseCase] = useState(""); // Store the use case
-  const [status, setStatus] = useState(null); // Status messages
-  const [savedJSON, setSavedJSON] = useState(null); // Store the saved JSON response
-  const [optimalOrder, setOptimalOrder] = useState(null); // Store the optimal order from GPT
-  const [narrative, setNarrative] = useState(""); // Store the generated narrative
-  const [isPanelOpen, setIsPanelOpen] = useState(false); // Control panel visibility
-  const [userCode, setUserCode] = useState(""); // Store the user code
-  const [isWorkflowSaved, setIsWorkflowSaved] = useState(false);
-  const [isNarrativeGenerated, setIsNarrativeGenerated] = useState(false);
-  const [uploadedFileName, setUploadedFileName] = useState(null);
-  const [isJsonUploaded, setIsJsonUploaded] = useState(false);
+  const [useCase, setUseCase] = useState("");
+  const [status, setStatus] = useState(null);
+  const [optimalOrder, setOptimalOrder] = useState(null);
+  const [narrative, setNarrative] = useState("");
+  const [proposedWorkflow, setProposedWorkflow] = useState(null);
+  const [renamedTechnologies, setRenamedTechnologies] = useState({});
 
-  // Add or remove technologies from the workflow
   const toggleTechnologyInWorkflow = (techName) => {
-    if (!userCode.trim()) {
-      setStatus("Please enter your User Code before selecting technologies.");
-      setTimeout(() => setStatus(null), 3000);
-      return;
-    }
-    setIsJsonUploaded(false);
-
-    if (workflow.find((job) => job.name === techName)) {
-      setWorkflow(workflow.filter((job) => job.name !== techName));
+    if (workflow.includes(techName)) {
+      setWorkflow(workflow.filter((name) => name !== techName));
     } else {
-      setWorkflow([...workflow, { name: techName }]);
+      setWorkflow([...workflow, techName]);
     }
   };
 
-  // Function to generate the best order for the workflow using GPT
-  const generateWorkflowOrder = async () => {
-    if (workflow.length === 0) {
-      setStatus("Please select at least one technology.");
+  const generateOptimalOrder = async () => {
+    if (workflow.length === 0 || !useCase.trim()) {
+      setStatus("Select technologies and provide a use case first.");
+      setTimeout(() => setStatus(null), 3000);
       return;
     }
 
-    if (!useCase.trim()) {
-      setStatus("Please enter a use case.");
-      return;
-    }
     setStatus("Generating optimal order...");
-
     try {
       const response = await fetch("http://localhost:5000/generate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Accept: "application/json",
         },
         body: JSON.stringify({
-          technologies: workflow.map((job) => job.name),
+          technologies: workflow,
           use_case: useCase,
         }),
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to generate workflow order.");
-      }
+      if (!response.ok) throw new Error("Failed to generate order.");
 
       const data = await response.json();
-      console.log("Generated Workflow Order:", data);
-
-      // Handle different response formats
-      if (data.optimal_order) {
-        setOptimalOrder(data.optimal_order);
-        setStatus("Optimal workflow order generated!");
-      } else if (data.workflow) {
-        setOptimalOrder(data.workflow);
-        setStatus("Optimal workflow order generated!");
-      } else {
-        setStatus("Error generating workflow order.");
-      }
+      setOptimalOrder(data.optimal_order);
+      setStatus("Optimal order generated!");
     } catch (error) {
-      console.error("Error generating workflow order:", error);
-      setStatus("Error generating workflow order. Please try again.");
+      console.error("Order Generation Error:", error);
+      setStatus("Error generating optimal order.");
     }
-
-    setTimeout(() => setStatus(null), 30000); // Automatically clear the status message after 30 seconds
+    setTimeout(() => setStatus(null), 3000);
   };
 
   const generateNarrative = async () => {
     if (workflow.length === 0 || !useCase.trim()) {
-      setStatus("Enter Use Case first. ");
-      setTimeout(() => setStatus(null), 5000);
+      setStatus("Provide technologies and use case first.");
+      setTimeout(() => setStatus(null), 3000);
       return;
     }
-    setStatus("Saving workflow before generating the narrative...");
+
+    setStatus("Generating narrative...");
+    setNarrative("");
 
     try {
-      // First, save the workflow automatically
-      await saveWorkflowToBackend();
-
-      setStatus("Generating workflow and narrative...");
-      setNarrative(""); // Clear the narrative before generating a new one
-
       const response = await fetch("http://localhost:5000/generate-narrative", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Accept: "application/json",
         },
         body: JSON.stringify({
-          technologies: workflow.map((job) => job.name),
+          technologies: workflow,
           use_case: useCase,
-          optimal_order: optimalOrder || workflow.map((job) => job.name),
+          optimal_order: optimalOrder || workflow,
         }),
       });
-
-      if (!response.ok) throw new Error("Failed to generate narrative.");
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -121,418 +83,332 @@ function App() {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-
-        let chunkText = decoder.decode(value, { stream: true });
-
-        chunkText = chunkText.replace(/\n([A-Z][^\n:]+):/g, "\n\n**$1**\n");
-
-        chunkText = chunkText.replace(/\n{3,}/g, "\n\n");
-
+        const chunkText = decoder.decode(value, { stream: true });
         fullNarrative += chunkText;
-
-        setNarrative(fullNarrative); // ✅ Update UI with cleaned narrative
+        setNarrative(fullNarrative);
       }
 
-      setStatus(null); // ✅ Clear status as soon as the narrative appears
-      setIsNarrativeGenerated(true);
+      setStatus("Narrative generated!");
     } catch (error) {
-      console.error("Error generating narrative:", error);
-      setStatus("Error generating narrative. Please try again.");
-      setTimeout(() => setStatus(null), 5000);
+      console.error("Narrative Generation Error:", error);
+      setStatus("Failed to generate narrative.");
     }
-
-    //   if (!response.ok) throw new Error("Failed to generate narrative.");
-    //   const data = await response.json();
-    //   setNarrative(data.narrative);
-    //   setStatus(null);
-    //   setIsNarrativeGenerated(true);
-    //   setTimeout(() => setStatus(null), 2000);
-    // } catch (error) {
-    //   console.error("Error generating narrative:", error);
-    //   setStatus("Error generating narrative. Please try again.");
-    //   setTimeout(() => setStatus(null), 5000);
-    // }
+    setTimeout(() => setStatus(null), 3000);
   };
 
-  // Save the workflow to the backend
-  const saveWorkflowToBackend = async () => {
-    setStatus("Saving workflow...");
-
-    // Log both workflow and optimal order before sending request
-    console.log("🟢 Saving Workflow...");
-    console.log(
-      "✅ Selected Technologies:",
-      workflow.map((job) => job.name)
-    );
-    console.log("🔵 Optimal Order:", optimalOrder);
-
-    try {
-      // If optimal order exists, use it. Otherwise, use selected technologies.
-      let finalWorkflow = optimalOrder?.length
-        ? optimalOrder
-        : workflow.map((job) => job.name);
-
-      // Convert the workflow to an array of strings (job names)
-      // const formattedWorkflow = workflow.map((job) => job.name);
-
-      console.log("🚀 Final Workflow Sent to Backend:", finalWorkflow);
-
-      const response = await fetch("http://localhost:5000/save-workflow", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({ workflow: finalWorkflow }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to save workflow.");
-      }
-
-      const data = await response.json();
-      console.log("Server Response:", data);
-      setSavedJSON(data);
-      setStatus("Workflow saved successfully!");
-      setIsWorkflowSaved(true);
-    } catch (error) {
-      console.error("Error saving workflow:", error);
-      setStatus("Error saving workflow. Please try again.");
-    }
-
-    setTimeout(() => setStatus(null), 3000); // Automatically clear the status message after 3 seconds
-  };
-
-  // Download the workflow as a JSON file
-  const downloadWorkflowAsJSON = () => {
-    const fileData = JSON.stringify(savedJSON, null, 2);
-    const blob = new Blob([fileData], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "workflow.json";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const uploadWorkflowToGitHub = async () => {
-    if (!savedJSON || !narrative) {
-      setStatus("No workflow or narrative to upload!");
+  const deployWorkflow = async () => {
+    if (!workflow.length || !useCase) {
+      alert("Please select technologies and enter a use case first.");
       return;
     }
 
-    setStatus("Uploading workflow to GitHub...");
-
     try {
-      const response = await fetch("http://localhost:5000/upload-github", {
+      setStatus("Deploying workflow...");
+      const response = await fetch("http://localhost:5000/generate_workflow", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          workflow_json: savedJSON,
-          narrative_text: narrative,
-          user_info: userCode?.trim() || "unknown_user",
+          jobs: workflow,
+          use_case: useCase,
         }),
       });
 
-      const data = await response.json();
-
-      if (
-        data.workflow?.status === "success" &&
-        data.narrative?.status === "success"
-      ) {
-        setStatus("Workflow and Narrative uploaded to GitHub successfully!");
-      } else {
-        setStatus("Upload failed. Check console for details.");
-        console.error("Upload Error:", data);
+      if (!response.ok) {
+        throw new Error("Failed to deploy workflow");
       }
+
+      const data = await response.json();
+      setStatus("Workflow deployed successfully!");
+      console.log("Deployed workflow:", data);
     } catch (error) {
-      console.error("Error uploading to GitHub:", error);
-      setStatus("An error occurred while uploading.");
+      console.error("Error deploying workflow:", error);
+      setStatus("Failed to deploy workflow. Please try again.");
+    }
+  };
+
+  const deployPersonalizedWorkflow = async () => {
+    if (
+      !workflow.length ||
+      !useCase ||
+      Object.keys(renamedTechnologies).length === 0
+    ) {
+      alert(
+        "Please select technologies, enter a use case, and personalize the workflow first."
+      );
+      return;
     }
 
+    try {
+      setStatus("Deploying personalized workflow...");
+      const response = await fetch(
+        "http://localhost:5000/deploy_personalized_workflow",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            technologies: workflow,
+            use_case: useCase,
+            optimal_order: optimalOrder,
+            renamed_technologies: renamedTechnologies,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to deploy personalized workflow");
+      }
+
+      const data = await response.json();
+      setStatus("Personalized workflow deployed successfully!");
+      console.log("Deployed personalized workflow:", data);
+    } catch (error) {
+      console.error("Error deploying personalized workflow:", error);
+      setStatus("Failed to deploy personalized workflow. Please try again.");
+    }
+  };
+
+  const generateProposedWorkflow = async () => {
+    if (!useCase.trim()) {
+      setStatus("Provide a use case first.");
+      return;
+    }
+
+    setStatus("Generating proposed workflow...");
+    setProposedWorkflow(null);
+    setWorkflow([]); // Clear existing workflow
+    setOptimalOrder(null); // Clear any existing optimal order
+
+    try {
+      const response = await fetch("http://localhost:5000/proposed_workflow", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ use_case: useCase }),
+      });
+
+      if (!response.ok)
+        throw new Error("Failed to generate proposed workflow.");
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let fullResponse = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunkText = decoder.decode(value, { stream: true });
+        fullResponse += chunkText;
+      }
+
+      try {
+        const data = JSON.parse(fullResponse);
+        if (data.technologies && data.workflow_order) {
+          // Update both the workflow and optimal order
+          setWorkflow(data.technologies);
+          setOptimalOrder(data.workflow_order);
+          setProposedWorkflow(data);
+
+          // Add a small delay to ensure the UI updates smoothly
+          setTimeout(() => {
+            setStatus("Technologies and workflow order generated!");
+          }, 100);
+        } else {
+          throw new Error("Invalid response format");
+        }
+      } catch (parseError) {
+        console.error("Error parsing response:", parseError);
+        setStatus("Error parsing proposed workflow response.");
+      }
+    } catch (error) {
+      console.error("Proposed Workflow Generation Error:", error);
+      setStatus("Failed to generate proposed workflow.");
+    }
     setTimeout(() => setStatus(null), 3000);
   };
 
-  // const handleFileUpload = (event) => {
-  //   const file = event.target.files[0];
-
-  //   if (!file) {
-  //     console.log("❌ No file detected.");
-  //     return;
-  //   }
-
-  //   console.log("📂 File selected:", file.name);
-
-  //   processJsonFile(file);
-  // };
-
-  const handleDrop = (event) => {
-    event.preventDefault();
-    const file = event.dataTransfer.files[0];
-    if (file) {
-      processJsonFile(file);
+  const handlePersonalizeUseCase = async () => {
+    if (!workflow.length || !useCase) {
+      alert("Please select technologies and enter a use case first.");
+      return;
     }
-  };
 
-  const handleFileUpload = (event) => {
-    const file = event.target.files[0]; // Get the uploaded file
-    if (file) {
-      processJsonFile(file);
-    }
-  };
-
-  const processJsonFile = (file) => {
-    // if (!file) return;
-
-    setUploadedFileName(file.name); // Display file name
-
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const jsonData = JSON.parse(e.target.result);
-
-        // To eventually update to the user code given etc
-        if (
-          !jsonData.WZA_DEMO_GEN ||
-          typeof jsonData.WZA_DEMO_GEN !== "object"
-        ) {
-          console.error("❌ Invalid JSON structure.");
-          setStatus(
-            "Invalid JSON format. Expected a Control-M workflow structure."
-          );
-          return;
+    try {
+      const response = await fetch(
+        "http://localhost:5000/rename_technologies",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            technologies: workflow,
+            use_case: useCase,
+            optimal_order: optimalOrder,
+          }),
         }
+      );
 
-        console.log("Uploading JSON to Backend:", jsonData);
-
-        // Extract job names from the Control-M JSON structure
-        const jobNames = Object.keys(jsonData.WZA_DEMO_GEN).filter(
-          (key) => key.startsWith("Run") // Only extract job names
-        );
-
-        if (jobNames.length === 0) {
-          console.error("❌ No technologies found in JSON.");
-          setStatus("No technologies found in the uploaded JSON.");
-          return;
-        }
-
-        console.log("📋 Extracted Job Names:", jobNames);
-
-        // Send JSON to backend for validation and processing
-        const response = await fetch(
-          "http://localhost:5000/upload-workflow-json",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ jobs: jobNames }),
-          }
-        );
-
-        const result = await response.json();
-
-        console.log("Backend Response:", result);
-
-        if (response.ok) {
-          setWorkflow(result.workflow.map((tech) => ({ name: tech }))); // Update UI workflow
-          setIsJsonUploaded(true);
-          setStatus("Workflow successfully loaded from JSON.");
-        } else {
-          setStatus(result.error || "Failed to process JSON file.");
-        }
-
-        setTimeout(() => setStatus(null), 3000);
-      } catch (error) {
-        console.error("Error parsing JSON:", error);
-        setStatus("Error reading JSON file. Ensure it is properly formatted.");
-        setTimeout(() => setStatus(null), 3000);
+      if (!response.ok) {
+        throw new Error("Failed to rename technologies");
       }
-    };
-    reader.readAsText(file);
+
+      const data = await response.json();
+      setRenamedTechnologies(data.renamed_technologies);
+    } catch (error) {
+      console.error("Error renaming technologies:", error);
+      alert("Failed to rename technologies. Please try again.");
+    }
+  };
+
+  const renderWorkflowItem = (tech, index) => {
+    const displayName = renamedTechnologies[tech] || tech;
+    return (
+      <li key={tech} className="ordered-item">
+        <span className="step-number">{index + 1}</span>
+        <span className="job-name">{displayName}</span>
+      </li>
+    );
   };
 
   return (
-    <div className={`app ${isPanelOpen ? "panel-open" : ""}`}>
-      {/* Header Section (Title & User Code Input) */}
+    <div className="app">
       <div className="content-container">
+        {/* LEFT: Title + Use Case + Grid */}
         <div className="left-column">
-          <div className="header-container">
-            <h1>Demonstration Generator</h1>
-            <div className="user-code-container">
-              <h3 htmlFor="userCode">Enter User Code:</h3>
-              <input
-                type="text"
-                id="userCode"
-                value={userCode}
-                onChange={(e) => setUserCode(e.target.value)}
-                placeholder="Example: zzz"
-              />
-            </div>
-          </div>
+          <h1>Demonstration Generator</h1>
           <div className="use-case-input">
-            <h3 htmlFor="useCase">Enter Use Case to Save Workflow:</h3>
+            <h3>Enter Use Case:</h3>
             <textarea
-              id="useCase"
               value={useCase}
               onChange={(e) => setUseCase(e.target.value)}
-              onInput={(e) => {
-                e.target.style.height = "auto";
-                e.target.style.height = e.target.scrollHeight + "px";
-              }}
-              placeholder="Input your Discovery Information"
-              rows="1"
+              placeholder="Describe your use case here..."
+              rows="3"
             />
+            <button
+              onClick={generateProposedWorkflow}
+              className="propose-tech-button"
+            >
+              Ask AI to Generate a list of Technologies based on Use Case
+            </button>
           </div>
 
-          {/* Main Content Section (FIX: Both Left & Right columns inside content-container) */}
           <h3>Select your technologies:</h3>
           <TechnologyGrid
-            selectedIcons={workflow.map((job) => job.name)}
+            selectedIcons={workflow}
             onToggle={toggleTechnologyInWorkflow}
-            disabled={!userCode.trim()} // Disable selection if user code is empty
           />
         </div>
 
-        {/* Right Column - Use Case & Workflow */}
+        {/* RIGHT: Selected Techs + Optimal Order + Narrative */}
         <div className="right-column">
-          {/* Upload JSON Section */}
-          {!isJsonUploaded && workflow.length === 0 && (
-            <div className="upload-section">
-              <h3>Or Upload a JSON File:</h3>
-              <div
-                className="drop-area"
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={handleDrop}
-              >
-                <label className="upload-label">
-                  <input
-                    type="file"
-                    accept=".json"
-                    onChange={handleFileUpload}
-                    style={{ display: "none" }}
-                  />
-                  <span className="upload-button">Browse File</span>
-                </label>
-              </div>
-              {uploadedFileName && <p>Uploaded File: {uploadedFileName}</p>}
-            </div>
-          )}
-
-          {/* Workflow Sections */}
-          {workflow.length > 0 && (
-            <div className="workflow-container">
-              {/* Selected Workflow */}
-              <div className="selected-workflow">
-                <h2>Selected Workflow</h2>
-                <div className="workflow">
-                  {workflow.map((job, index) => (
-                    <div key={`${job.name}-${index}`} className="workflow-box">
-                      {job.name}
+          <div className="workflow-container">
+            {workflow.length > 0 && (
+              <div className="selected-technologies">
+                <h3>Selected Technologies:</h3>
+                <div className="workflow-list">
+                  {workflow.map((tech, index) => (
+                    <div
+                      key={tech}
+                      className={`workflow-item ${
+                        proposedWorkflow?.technologies?.includes(tech)
+                          ? "ai-suggested"
+                          : ""
+                      }`}
+                      title={JOB_LIBRARY[tech]?.description || tech}
+                    >
+                      <span className="tech-name">
+                        {renamedTechnologies[tech] || tech}
+                        <span className="original-name">({tech})</span>
+                      </span>
                       <button
-                        className="delete-button"
-                        onClick={() => toggleTechnologyInWorkflow(job.name)}
+                        className="remove-tech"
+                        onClick={() => toggleTechnologyInWorkflow(tech)}
+                        title="Remove technology"
                       >
                         ❌
                       </button>
                     </div>
                   ))}
-                  {workflow.length > 0 && useCase && (
-                    <div className="workflow-buttons">
-                      <button
-                        className="generate-button"
-                        onClick={generateWorkflowOrder}
-                        disabled={workflow.length === 0 || !useCase.trim()}
-                      >
-                        Generate Optimal Order
-                      </button>
-
-                      {workflow.length > 0 && (
-                        <button
-                          className="save-button"
-                          onClick={generateNarrative}
-                        >
-                          Generate Workflow and Narrative
-                        </button>
-                      )}
-                      {savedJSON && isNarrativeGenerated && (
-                        <div className="workflow-actions">
-                          <button
-                            className="download-button"
-                            onClick={downloadWorkflowAsJSON}
-                          >
-                            Download Workflow as JSON
-                          </button>
-                          <button
-                            className="upload-button"
-                            onClick={uploadWorkflowToGitHub}
-                          >
-                            Upload Workflow on GitHub
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
+                {proposedWorkflow?.technologies && (
+                  <div className="ai-suggestion-note">
+                    <span className="ai-badge">AI</span>
+                    <span>AI-suggested technologies are highlighted</span>
+                  </div>
+                )}
               </div>
+            )}
 
-              {/* Optimal Workflow Order */}
-              {optimalOrder && (
-                <div className="optimal-workflow">
-                  <h2>Optimal Workflow Order</h2>
-                  <ul>
-                    {optimalOrder.map((job, index) => (
-                      <li key={index}>{job}</li>
-                    ))}
-                  </ul>
-
-                  {workflow.length > 0 && (
-                    <button className="save-button" onClick={generateNarrative}>
-                      Generate Workflow and Narrative
-                    </button>
+            {optimalOrder && (
+              <div className="optimal-workflow">
+                <h3>Optimal Order:</h3>
+                <ol className="ordered-list">
+                  {optimalOrder.map((tech, index) =>
+                    renderWorkflowItem(tech, index)
                   )}
-                  {savedJSON && isNarrativeGenerated && (
-                    <div className="workflow-actions">
-                      <button
-                        className="download-button"
-                        onClick={downloadWorkflowAsJSON}
-                      >
-                        Download Workflow as JSON
-                      </button>
-                      <button
-                        className="upload-button"
-                        onClick={uploadWorkflowToGitHub}
-                      >
-                        Upload Workflow on GitHub
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+                </ol>
+              </div>
+            )}
+          </div>
 
-          {/* Display status messages */}
-          {status && <div className="status-message">{status}</div>}
-          {/* Side-by-side view for JSON and Narrative */}
-          {savedJSON && narrative && (
-            <div className="output-container">
-              <div className="json-display">
-                <h3>Workflow in JSON</h3>
-                <pre>{JSON.stringify(savedJSON, null, 2)}</pre>
-              </div>
-              <div className="narrative-display">
-                <h3>Workflow Narrative</h3>
-                <div dangerouslySetInnerHTML={{ __html: marked(narrative) }} />
-              </div>
+          <div className="workflow-actions">
+            <button
+              className="action-button"
+              onClick={generateOptimalOrder}
+              disabled={!workflow.length || !useCase}
+            >
+              Generate Optimal Order
+            </button>
+            <button
+              className="action-button"
+              onClick={handlePersonalizeUseCase}
+              disabled={!workflow.length || !useCase}
+            >
+              Personalize Workflow To Use Case
+            </button>
+            <button
+              className="action-button"
+              onClick={deployWorkflow}
+              disabled={!workflow.length || !useCase}
+            >
+              Deploy Workflow
+            </button>
+            <button
+              className="action-button"
+              onClick={deployPersonalizedWorkflow}
+              disabled={
+                !workflow.length ||
+                !useCase ||
+                Object.keys(renamedTechnologies).length === 0
+              }
+            >
+              Deploy Personalized Workflow
+            </button>
+            <button
+              className="action-button"
+              onClick={generateNarrative}
+              disabled={!workflow.length || !useCase}
+            >
+              Generate Narrative
+            </button>
+          </div>
+
+          {status && <p className="status-message">{status}</p>}
+
+          {narrative && (
+            <div className="narrative-display">
+              <div dangerouslySetInnerHTML={{ __html: marked(narrative) }} />
             </div>
           )}
         </div>
-      </div>{" "}
+      </div>
     </div>
   );
 }
+
 export default App;

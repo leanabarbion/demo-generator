@@ -1,13 +1,25 @@
 import os
 from openai import OpenAI, AzureOpenAI
 from dotenv import load_dotenv
-from flask import Flask, request, jsonify, Response
+from flask import Flask, request, jsonify, Response, make_response
 import json
 from flask_cors import CORS
 import jobs
 import base64
 import requests
 from datetime import datetime
+
+from simple_workflow import initialize_workflow
+from ctm_python_client.core.workflow import JobCommand
+
+from ctm_python_client.core.workflow import *
+from ctm_python_client.core.comm import *
+from ctm_python_client.core.credential import *
+from aapi import *
+from my_secrets import my_secrets
+import attr
+import connectionprofile
+
 
 
 
@@ -43,6 +55,152 @@ REPO_OWNER = "leanabarbion"
 REPO_NAME = "workflow-repo"  # Replace with your repo name
 BRANCH = "main"
 BASE_FOLDER_PATH = "jobs"# Folder where files will be uploaded
+
+
+
+
+# Import all job classes you want to support
+from ctm_python_client.core.workflow import (
+    JobCommand, JobDatabase, JobDatabaseSQLScript, JobDatabaseEmbeddedQuery,
+    JobDatabaseStoredProcedure, JobDatabaseMSSQLAgentJob, JobDatabaseMSSQL_SSIS,
+    JobFileTransfer, JobHadoop, JobAwsEC2, JobAwsQuickSight
+)
+
+# Dynamic job type to class mapping
+job_type_mapping = {
+    "JobCommand": JobCommand,
+    "JobDatabase": JobDatabase,
+    "JobDatabaseSQLScript": JobDatabaseSQLScript,
+    "JobDatabaseEmbeddedQuery": JobDatabaseEmbeddedQuery,
+    "JobDatabaseStoredProcedure": JobDatabaseStoredProcedure,
+    "JobDatabaseMSSQLAgentJob": JobDatabaseMSSQLAgentJob,
+    "JobDatabaseMSSQL_SSIS": JobDatabaseMSSQL_SSIS,
+    "JobFileTransfer": JobFileTransfer,
+    "JobHadoop": JobHadoop,
+    "JobAwsEC2": JobAwsEC2,
+    "JobAwsQuickSight": JobAwsQuickSight,
+}
+
+# Utility: Find required fields of a job class
+def get_required_fields(job_class):
+    fields = attr.fields(job_class)
+    required = []
+    for f in fields:
+        if f.default == attr.NOTHING and not f.init is False and not f.kw_only:
+            required.append(f.name)
+        if f.default == attr.NOTHING and f.kw_only:
+            required.append(f.name)
+    return required
+
+app = Flask(__name__)
+
+@app.route('/job_types', methods=['GET'])
+def list_job_types():
+    job_type_fields = {}
+
+    for job_type, job_class in job_type_mapping.items():
+        fields = attr.fields(job_class)
+        required = [
+            f.name for f in fields
+            if f.default == attr.NOTHING and not f.init is False
+        ]
+        job_type_fields[job_type] = required
+
+    return jsonify(job_type_fields)
+
+
+@app.after_request
+def after_request(response):
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    return response
+
+@app.route('/generate_workflow_json', methods=['POST','OPTIONS'])
+def generate_workflow_json():
+    if request.method == 'OPTIONS':
+        return '', 204
+
+    data = request.json
+
+    if not data or 'jobs' not in data:
+        return jsonify({"error": "Missing 'jobs' list in request."}), 400
+
+    job_definitions = data['jobs']
+
+    if not isinstance(job_definitions, list) or len(job_definitions) < 1:
+        return jsonify({"error": "'jobs' must be a list with at least one job definition."}), 400
+
+    # Create the base workflow (environment, defaults)
+    workflow, folder_name = initialize_workflow()
+
+    job_names = []  # To connect jobs later
+
+    for job_data in job_definitions:
+        job_type = job_data.get('type')
+        object_name = job_data.get('object_name')
+
+        if not job_type or not object_name:
+            return jsonify({"error": "Each job must have 'type' and 'object_name'."}), 400
+
+
+        job_class = job_type_mapping.get(job_type)
+
+        if not job_class:
+            return jsonify({"error": f"Unsupported job type: {job_type}"}), 400
+
+        # Validate required fields
+        required_fields = get_required_fields(job_class)
+        missing_fields = [field for field in required_fields if field not in job_data]
+
+        if missing_fields:
+            return jsonify({"error": f"Missing required fields for {job_type}: {missing_fields}"}), 400
+
+        # Pass all fields except 'type' into constructor
+        job_kwargs = {k: v for k, v in job_data.items() if k != 'type'}
+
+        profile_json = get_connection_profile_for_job(object_name)
+        # You can now include this profile in job_kwargs (if the job supports it)
+        if "object_name" in [f.name for f in attr.fields(job_class)]:
+            # You might want to extract the profile name key from the JSON
+            profile_name = list(profile_json.keys())[0]
+            job_kwargs.setdefault("object_name", profile_name)
+
+        try:
+            job = job_class(**job_kwargs)
+        except Exception as e:
+            return jsonify({"error": f"Failed to create {job_type}: {str(e)}"}), 400
+
+        workflow.add(job, inpath=folder_name)
+
+        job_names.append(f"{folder_name}/{object_name}")
+
+    # Connect jobs in sequence
+    for i in range(len(job_names) - 1):
+        workflow.connect(job_names[i], job_names[i+1])    
+
+
+    workflow_json = json.loads(workflow.dumps_json()) 
+   
+
+    return jsonify(workflow_json)
+
+
+
+def get_connection_profile_for_job(job_name: str) -> dict:
+    """
+    Return the connection profile JSON for the given job_name.
+
+    - If a function with the name job_name exists in connectionprofile.py, call it.
+    - Otherwise return a default connection profile.
+    """
+    profile_func = getattr(connectionprofile, job_name, None)
+
+    if callable(profile_func):
+        return profile_func()
+    else:
+        return connectionprofile.Default_Connection_Profile()
+
 
 def upload_to_github(file_path, content, message):
     """Uploads a file to GitHub repository using GitHub API."""
