@@ -1,1 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+env/
 .env
+
+# Node
+node_modules/
+package-lock.json
+package.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Project specific
+backend/output.json
+backend/my_secrets.py
+backend/Workspace_*.json
+backend/*.pyc
+backend/__pycache__/
+backend/venv/
+
+# Keep these files
+!backend/requirements.txt
