@@ -24,7 +24,6 @@ package.json
 # Ignore everything in backend
 backend/*
 # Except these specific files
-!backend/app.py
 !backend/simpletestapp.py
 !backend/requirements.txt
 !backend/job_library.py
