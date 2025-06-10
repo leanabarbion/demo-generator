@@ -12,49 +12,55 @@ function App() {
   const [narrative, setNarrative] = useState("");
   const [proposedWorkflow, setProposedWorkflow] = useState(null);
   const [renamedTechnologies, setRenamedTechnologies] = useState({});
+  const [selectedTechnologies, setSelectedTechnologies] = useState([]);
 
   const toggleTechnologyInWorkflow = (techName) => {
-    if (workflow.includes(techName)) {
-      setWorkflow(workflow.filter((name) => name !== techName));
-    } else {
-      setWorkflow([...workflow, techName]);
-    }
+    setSelectedTechnologies((prev) => {
+      if (prev.includes(techName)) {
+        return prev.filter((tech) => tech !== techName);
+      } else {
+        return [...prev, techName];
+      }
+    });
   };
 
   const generateOptimalOrder = async () => {
-    if (workflow.length === 0 || !useCase.trim()) {
+    if (selectedTechnologies.length === 0 || !useCase.trim()) {
       setStatus("Select technologies and provide a use case first.");
       setTimeout(() => setStatus(null), 3000);
       return;
     }
 
-    setStatus("Generating optimal order...");
     try {
+      setStatus("Generating optimal order...");
       const response = await fetch("http://localhost:5000/generate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          technologies: workflow,
+          technologies: selectedTechnologies,
           use_case: useCase,
         }),
       });
 
-      if (!response.ok) throw new Error("Failed to generate order.");
+      if (!response.ok) {
+        throw new Error("Failed to generate optimal order");
+      }
 
       const data = await response.json();
       setOptimalOrder(data.optimal_order);
-      setStatus("Optimal order generated!");
+      setStatus("Optimal order generated successfully!");
+      setTimeout(() => setStatus(null), 3000);
     } catch (error) {
-      console.error("Order Generation Error:", error);
-      setStatus("Error generating optimal order.");
+      console.error("Error generating optimal order:", error);
+      setStatus("Failed to generate optimal order. Please try again.");
+      setTimeout(() => setStatus(null), 3000);
     }
-    setTimeout(() => setStatus(null), 3000);
   };
 
   const generateNarrative = async () => {
-    if (workflow.length === 0 || !useCase.trim()) {
+    if (selectedTechnologies.length === 0 || !useCase.trim()) {
       setStatus("Provide technologies and use case first.");
       setTimeout(() => setStatus(null), 3000);
       return;
@@ -70,9 +76,9 @@ function App() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          technologies: workflow,
+          technologies: selectedTechnologies,
           use_case: useCase,
-          optimal_order: optimalOrder || workflow,
+          optimal_order: optimalOrder || selectedTechnologies,
         }),
       });
 
@@ -97,7 +103,7 @@ function App() {
   };
 
   const deployWorkflow = async () => {
-    if (!workflow.length || !useCase) {
+    if (!selectedTechnologies.length || !useCase) {
       alert("Please select technologies and enter a use case first.");
       return;
     }
@@ -110,7 +116,7 @@ function App() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          jobs: workflow,
+          jobs: selectedTechnologies,
           use_case: useCase,
         }),
       });
@@ -130,7 +136,7 @@ function App() {
 
   const deployPersonalizedWorkflow = async () => {
     if (
-      !workflow.length ||
+      !selectedTechnologies.length ||
       !useCase ||
       Object.keys(renamedTechnologies).length === 0
     ) {
@@ -150,7 +156,7 @@ function App() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            technologies: workflow,
+            technologies: selectedTechnologies,
             use_case: useCase,
             optimal_order: optimalOrder,
             renamed_technologies: renamedTechnologies,
@@ -179,7 +185,7 @@ function App() {
 
     setStatus("Generating proposed workflow...");
     setProposedWorkflow(null);
-    setWorkflow([]); // Clear existing workflow
+    setSelectedTechnologies([]); // Clear existing selected technologies
     setOptimalOrder(null); // Clear any existing optimal order
 
     try {
@@ -209,7 +215,7 @@ function App() {
         const data = JSON.parse(fullResponse);
         if (data.technologies && data.workflow_order) {
           // Update both the workflow and optimal order
-          setWorkflow(data.technologies);
+          setSelectedTechnologies(data.technologies);
           setOptimalOrder(data.workflow_order);
           setProposedWorkflow(data);
 
@@ -232,12 +238,13 @@ function App() {
   };
 
   const handlePersonalizeUseCase = async () => {
-    if (!workflow.length || !useCase) {
+    if (!selectedTechnologies.length || !useCase) {
       alert("Please select technologies and enter a use case first.");
       return;
     }
 
     try {
+      setStatus("Personalizing workflow names to match use case...");
       const response = await fetch(
         "http://localhost:5000/rename_technologies",
         {
@@ -246,7 +253,7 @@ function App() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            technologies: workflow,
+            technologies: selectedTechnologies,
             use_case: useCase,
             optimal_order: optimalOrder,
           }),
@@ -259,9 +266,14 @@ function App() {
 
       const data = await response.json();
       setRenamedTechnologies(data.renamed_technologies);
+      setStatus(
+        "Workflow names have been personalized to match your use case!"
+      );
+      setTimeout(() => setStatus(null), 3000);
     } catch (error) {
       console.error("Error renaming technologies:", error);
-      alert("Failed to rename technologies. Please try again.");
+      setStatus("Failed to personalize workflow names. Please try again.");
+      setTimeout(() => setStatus(null), 3000);
     }
   };
 
@@ -299,7 +311,7 @@ function App() {
 
           <h3>Select your technologies:</h3>
           <TechnologyGrid
-            selectedIcons={workflow}
+            selectedIcons={selectedTechnologies}
             onToggle={toggleTechnologyInWorkflow}
           />
         </div>
@@ -307,11 +319,11 @@ function App() {
         {/* RIGHT: Selected Techs + Optimal Order + Narrative */}
         <div className="right-column">
           <div className="workflow-container">
-            {workflow.length > 0 && (
+            {selectedTechnologies.length > 0 && (
               <div className="selected-technologies">
                 <h3>Selected Technologies:</h3>
                 <div className="workflow-list">
-                  {workflow.map((tech, index) => (
+                  {selectedTechnologies.map((tech, index) => (
                     <div
                       key={tech}
                       className={`workflow-item ${
@@ -360,21 +372,21 @@ function App() {
             <button
               className="action-button"
               onClick={generateOptimalOrder}
-              disabled={!workflow.length || !useCase}
+              disabled={!selectedTechnologies.length || !useCase}
             >
               Generate Optimal Order
             </button>
             <button
               className="action-button"
               onClick={handlePersonalizeUseCase}
-              disabled={!workflow.length || !useCase}
+              disabled={!selectedTechnologies.length || !useCase}
             >
               Personalize Workflow To Use Case
             </button>
             <button
               className="action-button"
               onClick={deployWorkflow}
-              disabled={!workflow.length || !useCase}
+              disabled={!selectedTechnologies.length || !useCase}
             >
               Deploy Workflow
             </button>
@@ -382,7 +394,7 @@ function App() {
               className="action-button"
               onClick={deployPersonalizedWorkflow}
               disabled={
-                !workflow.length ||
+                !selectedTechnologies.length ||
                 !useCase ||
                 Object.keys(renamedTechnologies).length === 0
               }
@@ -392,7 +404,7 @@ function App() {
             <button
               className="action-button"
               onClick={generateNarrative}
-              disabled={!workflow.length || !useCase}
+              disabled={!selectedTechnologies.length || !useCase}
             >
               Generate Narrative
             </button>

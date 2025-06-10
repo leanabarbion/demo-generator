@@ -128,11 +128,40 @@ def generate():
             messages=[
                 {
                     "role": "system",
-                    "content": "You are an assistant that organizes technologies into an optimized workflow order for BMC Control-M based on a use case."
+                    "content": """You are an expert BMC Control-M workflow architect that determines the optimal execution order of technologies based on technical dependencies and business requirements.
+
+                    CRITICAL RULES:
+                    1. You MUST include ALL technologies provided in your response
+                    2. Do not add or remove any technologies
+                    3. Order technologies based on these technical principles:
+                       - Data dependencies (which jobs need data from other jobs)
+                       - Resource dependencies (which jobs need resources from other jobs)
+                       - Logical flow (which jobs must complete before others can start)
+                       - Error handling and recovery considerations
+                       - Performance optimization
+                    4. The order must be technically sound and follow BMC Control-M best practices
+                    5. The same input (technologies + use case) must ALWAYS produce the same optimal order
+                    6. Consider the use case's specific requirements when determining dependencies
+                    7. Return the exact same technologies, just in the optimal technical order
+
+                    Your response must be deterministic - the same input must always produce the same output."""
                 },
                 {
                     "role": "user",
-                    "content": f"Technologies: {technologies}\nUse Case: {use_case}\nProvide the optimal order of technologies in JSON format like this: {{\"workflow_order\": [\"Technology1\", \"Technology2\"]}}."
+                    "content": f"""Analyze these technologies and determine their optimal execution order based on the use case:
+                    Technologies: {technologies}
+                    Use Case: {use_case}
+
+                    Consider:
+                    1. Technical dependencies between jobs
+                    2. Data flow requirements
+                    3. Resource dependencies
+                    4. Error handling needs
+                    5. Performance optimization
+                    6. Use case specific requirements
+
+                    Provide the optimal order in JSON format: {{"workflow_order": ["Technology1", "Technology2"]}}
+                    Remember to include ALL technologies in your response."""
                 }
             ]
         )
@@ -151,7 +180,13 @@ def generate():
 
         ordered_workflow = extract_json_from_response(response_content)
         if ordered_workflow:
-            return jsonify({"optimal_order": ordered_workflow.get("workflow_order")}), 200
+            # Verify that all technologies are included in the response
+            workflow_order = ordered_workflow.get("workflow_order", [])
+            if set(workflow_order) == set(technologies):
+                return jsonify({"optimal_order": workflow_order}), 200
+            else:
+                app.logger.warning("AI response missing some technologies, using original order")
+                return jsonify({"optimal_order": technologies}), 200
         else:
             return jsonify({"optimal_order": technologies}), 200
 
