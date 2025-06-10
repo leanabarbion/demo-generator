@@ -27,3 +27,5 @@ backend/*
 !backend/simpletestapp.py
 !backend/requirements.txt
 !backend/job_library.py
+!backend/output.json
+

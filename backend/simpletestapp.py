@@ -3,7 +3,7 @@ from ctm_python_client.core.workflow import *
 from ctm_python_client.core.credential import *
 from ctm_python_client.core.comm import *
 from aapi import *
-from my_secrets import my_secrets
+from my_secrets import *
 import subprocess
 from flask_cors import CORS
 import os
@@ -39,26 +39,48 @@ def generate_workflow():
         return jsonify({"error": "Missing 'jobs' in request."}), 400
 
     requested_jobs = data['jobs']
+    environment = data.get('environment', 'saas_dev')  # Default to saas_dev if not specified
+    folder_name = data.get('folder_name', 'LBA_DEMGEN_VB')
+    user_code = data.get('user_code', 'LBA')  # Default to LBA if not specified
+
+    # Validate environment
+    valid_environments = ['saas_dev', 'saas_preprod', 'saas_prod', 'vse_dev', 'vse_qa', 'vse_prod']
+    if environment not in valid_environments:
+        return jsonify({"error": f"Invalid environment. Must be one of: {valid_environments}"}), 400
+
+    # Set Control-M server based on environment
+    if environment.startswith('saas'):
+        controlm_server = "IN01"
+    elif environment == 'vse_dev':
+        controlm_server = "DEV"
+    elif environment == 'vse_qa':
+        controlm_server = "QA"
+    elif environment == 'vse_prod':
+        controlm_server = "PROD"
+    else:
+        return jsonify({"error": "Invalid environment configuration"}), 400
+
+    # Format folder and application names with user code
+    formatted_folder_name = f"{user_code}_DEMGEN_VB"
+    formatted_application = f"{user_code}-DMO-GEN"
+    formatted_sub_application = f"{user_code}-TEST-APP"
 
     # ENV & defaults
     my_env = Environment.create_saas(
-        endpoint=my_secrets['helix_sandbox_endpoint'],
-        api_key=my_secrets['helix_sandbox_api_key']
+        endpoint=my_secrets[f'{environment}_endpoint'],
+        api_key=my_secrets[f'{environment}_api_key']
     )
 
     defaults = WorkflowDefaults(
         run_as="ctmagent",
         host="zzz-linux-agents",
-        application="LBA-DMO-GEN",
-        sub_application="TEST-APP"
+        application=formatted_application,
+        sub_application=formatted_sub_application
     )
 
     workflow = Workflow(my_env, defaults=defaults)
-    folder_name = "LBA_DEMGEN_VB"
-    folder = Folder(folder_name, site_standard="Empty", controlm_server="IN01")
+    folder = Folder(formatted_folder_name, site_standard="Empty", controlm_server=controlm_server)
     workflow.add(folder)
-
-
 
     job_paths = []
 
@@ -67,18 +89,15 @@ def generate_workflow():
             return jsonify({"error": f"Unknown job: {job_key}"}), 400
 
         job = JOB_LIBRARY[job_key]()
-        workflow.add(job, inpath=folder_name)
-        job_paths.append(f"{folder_name}/{job.object_name}")
+        workflow.add(job, inpath=formatted_folder_name)
+        job_paths.append(f"{formatted_folder_name}/{job.object_name}")
 
     #Chaining jobs
     for i in range(len(job_paths) - 1):
         workflow.connect(job_paths[i], job_paths[i + 1])
 
-
-       
     raw_json = workflow.dumps_json()
     print(raw_json)
-
 
     # Check for build and deploy errors
     build_errors = workflow.build().errors
@@ -102,13 +121,11 @@ def generate_workflow():
         except subprocess.CalledProcessError as e:
             print(f"An error occurred while running Control-M commands: {e}")
 
-        
-    
     return Response(raw_json, mimetype='application/json')
 
 
-@app.route("/generate", methods=["POST"])
-def generate():
+@app.route("/generate_optimal_order", methods=["POST"])
+def generate_optimal_order():
     """
     Generate an optimized order for selected technologies based on a use case using GPT.
     """
@@ -391,11 +408,31 @@ def deploy_personalized_workflow():
         use_case = data.get("use_case")
         renamed_technologies = data.get("renamed_technologies")
         ordered_workflow = data.get("optimal_order") or technologies
+        environment = data.get('environment', 'saas_dev')  # Default to saas_dev if not specified
+        user_code = data.get('user_code', 'LBA')  # Default to LBA if not specified
+        folder_name = data.get('folder_name', 'DEMGEN_VB')
+        application = data.get('application', 'DMO-GEN')
+        sub_application = data.get('sub_application', 'TEST-APP')
 
         if not technologies or not use_case or not renamed_technologies:
             return jsonify({"error": "Technologies, use case, and renamed technologies are required."}), 400
         
-        app.logger.info(f"🔄 Deploying Personalized Workflow for Use Case: {use_case}")
+        # Validate environment
+        valid_environments = ['saas_dev', 'saas_preprod', 'saas_prod', 'vse_dev', 'vse_qa', 'vse_prod']
+        if environment not in valid_environments:
+            return jsonify({"error": f"Invalid environment. Must be one of: {valid_environments}"}), 400
+
+        # Set Control-M server based on environment
+        if environment.startswith('saas'):
+            controlm_server = "IN01"
+        elif environment == 'vse_dev':
+            controlm_server = "DEV"
+        elif environment == 'vse_qa':
+            controlm_server = "QA"
+        elif environment == 'vse_prod':
+            controlm_server = "PROD"
+        else:
+            return jsonify({"error": "Invalid environment configuration"}), 400
 
         # First, get the AI to convert the names to Control-M format
         completion = client.chat.completions.create(
@@ -439,25 +476,28 @@ def deploy_personalized_workflow():
             json_str = response_content[start:end]
             controlm_jobs = json.loads(json_str)["controlm_jobs"]
         except Exception as e:
-            app.logger.error(f"❌ Error parsing Control-M job names: {str(e)}")
             return jsonify({"error": "Failed to parse Control-M job names"}), 500
 
         # Create the workflow with the new job names
         my_env = Environment.create_saas(
-            endpoint=my_secrets['helix_sandbox_endpoint'],
-            api_key=my_secrets['helix_sandbox_api_key']
+            endpoint=my_secrets[f'{environment}_endpoint'],
+            api_key=my_secrets[f'{environment}_api_key']
         )
+
+        # Format folder and application names with user code
+        formatted_folder_name = f"{user_code}_{folder_name}"
+        formatted_application = f"{user_code}-{application}"
+        formatted_sub_application = f"{user_code}-{sub_application}"
 
         defaults = WorkflowDefaults(
             run_as="ctmagent",
             host="zzz-linux-agents",
-            application="LBA-DMO-GEN",
-            sub_application="TEST-APP"
+            application=formatted_application,
+            sub_application=formatted_sub_application
         )
 
         workflow = Workflow(my_env, defaults=defaults)
-        folder_name = "LBA_DEMGEN_VB"
-        folder = Folder(folder_name, site_standard="Empty", controlm_server="IN01")
+        folder = Folder(formatted_folder_name, site_standard="Empty", controlm_server=controlm_server)
         workflow.add(folder)
 
         job_paths = []
@@ -475,8 +515,8 @@ def deploy_personalized_workflow():
             new_name = controlm_jobs.get(job_key, f"zzt-{job_key}")
             job.object_name = new_name
             
-            workflow.add(job, inpath=folder_name)
-            job_paths.append(f"{folder_name}/{new_name}")
+            workflow.add(job, inpath=formatted_folder_name)
+            job_paths.append(f"{formatted_folder_name}/{new_name}")
             ordered_jobs.append(new_name)
 
         # Chain the jobs in the specified order
@@ -501,7 +541,10 @@ def deploy_personalized_workflow():
                 return jsonify({
                     "message": "Personalized workflow deployed successfully",
                     "workflow": raw_json,
-                    "ordered_jobs": ordered_jobs
+                    "ordered_jobs": ordered_jobs,
+                    "environment": environment,
+                    "controlm_server": controlm_server,
+                    "folder_name": formatted_folder_name
                 }), 200
             except subprocess.CalledProcessError as e:
                 return jsonify({"error": f"Control-M command failed: {str(e)}"}), 500
@@ -513,7 +556,6 @@ def deploy_personalized_workflow():
             }), 500
 
     except Exception as e:
-        app.logger.error(f"❌ Error deploying personalized workflow: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 

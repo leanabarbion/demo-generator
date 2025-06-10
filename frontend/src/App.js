@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "./App.css";
 import TechnologyGrid from "./TechnologyGrid";
 import { marked } from "marked";
@@ -13,6 +13,12 @@ function App() {
   const [proposedWorkflow, setProposedWorkflow] = useState(null);
   const [renamedTechnologies, setRenamedTechnologies] = useState({});
   const [selectedTechnologies, setSelectedTechnologies] = useState([]);
+  const [showDeployModal, setShowDeployModal] = useState(false);
+  const [deployConfig, setDeployConfig] = useState({
+    environment: "saas_dev",
+    userCode: "LBA",
+    folderName: "DEMGEN_VB",
+  });
 
   const toggleTechnologyInWorkflow = (techName) => {
     setSelectedTechnologies((prev) => {
@@ -33,16 +39,19 @@ function App() {
 
     try {
       setStatus("Generating optimal order...");
-      const response = await fetch("http://localhost:5000/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          technologies: selectedTechnologies,
-          use_case: useCase,
-        }),
-      });
+      const response = await fetch(
+        "http://localhost:5000/generate_optimal_order",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            technologies: selectedTechnologies,
+            use_case: useCase,
+          }),
+        }
+      );
 
       if (!response.ok) {
         throw new Error("Failed to generate optimal order");
@@ -102,52 +111,92 @@ function App() {
     setTimeout(() => setStatus(null), 3000);
   };
 
-  const deployWorkflow = async () => {
+  const handleDeployConfigChange = (field, value) => {
+    setDeployConfig((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const handleDeployWorkflow = async () => {
+    console.log("Deploy workflow button clicked");
+    console.log("Current state:", {
+      selectedTechnologies,
+      useCase,
+      deployConfig,
+    });
+
     if (!selectedTechnologies.length || !useCase) {
+      console.log("Missing prerequisites:", {
+        hasTechnologies: selectedTechnologies.length > 0,
+        hasUseCase: !!useCase,
+      });
       alert("Please select technologies and enter a use case first.");
       return;
     }
 
     try {
+      console.log("Starting workflow deployment with config:", deployConfig);
       setStatus("Deploying workflow...");
+
+      const requestBody = {
+        jobs: selectedTechnologies,
+        environment: deployConfig.environment,
+        folder_name: deployConfig.folderName,
+        user_code: deployConfig.userCode,
+      };
+
+      console.log("Sending deployment request with body:", requestBody);
+
       const response = await fetch("http://localhost:5000/generate_workflow", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          jobs: selectedTechnologies,
-          use_case: useCase,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
+      console.log("Received response:", response.status);
+
       if (!response.ok) {
-        throw new Error("Failed to deploy workflow");
+        const errorData = await response.json();
+        console.error("Deployment failed:", errorData);
+        throw new Error(errorData.error || "Failed to deploy workflow");
       }
 
       const data = await response.json();
+      console.log("Deployment successful:", data);
       setStatus("Workflow deployed successfully!");
-      console.log("Deployed workflow:", data);
+      setTimeout(() => setStatus(""), 3000);
     } catch (error) {
-      console.error("Error deploying workflow:", error);
-      setStatus("Failed to deploy workflow. Please try again.");
+      console.error("Deployment error:", error);
+      setStatus(`Error: ${error.message}`);
+      setTimeout(() => setStatus(""), 3000);
     }
   };
 
-  const deployPersonalizedWorkflow = async () => {
-    if (
-      !selectedTechnologies.length ||
-      !useCase ||
-      Object.keys(renamedTechnologies).length === 0
-    ) {
-      alert(
-        "Please select technologies, enter a use case, and personalize the workflow first."
-      );
-      return;
-    }
-
+  const handlePersonalizedDeployConfirm = async () => {
     try {
+      // Close modal immediately when deploy is clicked
+      setShowDeployModal(false);
+
+      console.log("Starting deployment with config:", deployConfig);
       setStatus("Deploying personalized workflow...");
+
+      const requestBody = {
+        technologies: selectedTechnologies,
+        use_case: useCase,
+        renamed_technologies: renamedTechnologies,
+        optimal_order: workflow,
+        environment: deployConfig.environment,
+        user_code: deployConfig.userCode,
+        folder_name: deployConfig.folderName,
+        application: deployConfig.application,
+        sub_application: deployConfig.subApplication,
+      };
+
+      console.log("Request body:", JSON.stringify(requestBody, null, 2));
+
       const response = await fetch(
         "http://localhost:5000/deploy_personalized_workflow",
         {
@@ -155,26 +204,73 @@ function App() {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            technologies: selectedTechnologies,
-            use_case: useCase,
-            optimal_order: optimalOrder,
-            renamed_technologies: renamedTechnologies,
-          }),
+          body: JSON.stringify(requestBody),
         }
       );
 
+      console.log("Response status:", response.status);
+      console.log(
+        "Response headers:",
+        Object.fromEntries(response.headers.entries())
+      );
+
+      const responseText = await response.text();
+      console.log("Raw response:", responseText);
+
       if (!response.ok) {
-        throw new Error("Failed to deploy personalized workflow");
+        let errorMessage;
+        try {
+          const errorData = JSON.parse(responseText);
+          errorMessage = errorData.error || "Failed to deploy workflow";
+        } catch (e) {
+          errorMessage = `Server error: ${responseText}`;
+        }
+        console.error("Deployment failed:", errorMessage);
+        throw new Error(errorMessage);
       }
 
-      const data = await response.json();
-      setStatus("Personalized workflow deployed successfully!");
-      console.log("Deployed personalized workflow:", data);
+      let data;
+      try {
+        data = JSON.parse(responseText);
+        console.log("Parsed response data:", data);
+      } catch (e) {
+        console.error("Failed to parse response as JSON:", e);
+        throw new Error("Invalid response from server");
+      }
+
+      setStatus("Workflow deployed successfully!");
+      setTimeout(() => setStatus(""), 3000);
     } catch (error) {
-      console.error("Error deploying personalized workflow:", error);
-      setStatus("Failed to deploy personalized workflow. Please try again.");
+      console.error("Deployment error:", error);
+      setStatus(`Error: ${error.message}`);
+      setTimeout(() => setStatus(""), 3000);
     }
+  };
+
+  const handleDeployPersonalizedWorkflow = () => {
+    console.log("Deploy button clicked");
+    console.log("Current state:", {
+      selectedTechnologies,
+      useCase,
+      renamedTechnologies,
+      workflow,
+    });
+
+    if (!selectedTechnologies.length || !useCase) {
+      console.log("Missing prerequisites:", {
+        hasTechnologies: selectedTechnologies.length > 0,
+        hasUseCase: !!useCase,
+      });
+      alert("Please select technologies and enter a use case first.");
+      return;
+    }
+    if (!renamedTechnologies) {
+      console.log("Workflow not personalized");
+      alert("Please personalize the workflow names first.");
+      return;
+    }
+    console.log("Opening deployment modal");
+    setShowDeployModal(true);
   };
 
   const generateProposedWorkflow = async () => {
@@ -287,8 +383,13 @@ function App() {
     );
   };
 
+  // Add useEffect to monitor state changes
+  useEffect(() => {
+    console.log("Deployment modal state:", showDeployModal);
+  }, [showDeployModal]);
+
   return (
-    <div className="app">
+    <div className="app-container">
       <div className="content-container">
         {/* LEFT: Title + Use Case + Grid */}
         <div className="left-column">
@@ -381,22 +482,20 @@ function App() {
               onClick={handlePersonalizeUseCase}
               disabled={!selectedTechnologies.length || !useCase}
             >
-              Personalize Workflow To Use Case
+              Personalize Workflow to Use Case
             </button>
-            <button
+            {/* <button
               className="action-button"
-              onClick={deployWorkflow}
+              onClick={handleDeployWorkflow}
               disabled={!selectedTechnologies.length || !useCase}
             >
               Deploy Workflow
-            </button>
+            </button> */}
             <button
               className="action-button"
-              onClick={deployPersonalizedWorkflow}
+              onClick={handleDeployPersonalizedWorkflow}
               disabled={
-                !selectedTechnologies.length ||
-                !useCase ||
-                Object.keys(renamedTechnologies).length === 0
+                !selectedTechnologies.length || !useCase || !renamedTechnologies
               }
             >
               Deploy Personalized Workflow
@@ -419,6 +518,94 @@ function App() {
           )}
         </div>
       </div>
+
+      {/* Deployment Configuration Modal */}
+      {showDeployModal && (
+        <div className="modal">
+          <div className="modal-content">
+            <h3>Deployment Configuration</h3>
+            <div className="form-group">
+              <label>Environment:</label>
+              <select
+                value={deployConfig.environment}
+                onChange={(e) =>
+                  setDeployConfig((prev) => ({
+                    ...prev,
+                    environment: e.target.value,
+                  }))
+                }
+              >
+                <option value="saas_dev">SaaS Dev</option>
+                <option value="saas_preprod">SaaS Preprod</option>
+                <option value="saas_prod">SaaS Prod</option>
+                <option value="vse_dev">VSE Dev</option>
+                <option value="vse_qa">VSE QA</option>
+                <option value="vse_prod">VSE Prod</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>User Code:</label>
+              <input
+                type="text"
+                value={deployConfig.userCode}
+                onChange={(e) =>
+                  setDeployConfig((prev) => ({
+                    ...prev,
+                    userCode: e.target.value,
+                  }))
+                }
+                placeholder="Enter user code"
+              />
+            </div>
+            <div className="form-group">
+              <label>Folder Name:</label>
+              <input
+                type="text"
+                value={deployConfig.folderName}
+                onChange={(e) =>
+                  setDeployConfig((prev) => ({
+                    ...prev,
+                    folderName: e.target.value,
+                  }))
+                }
+                placeholder="Enter folder name"
+              />
+            </div>
+            <div className="form-group">
+              <label>Application:</label>
+              <input
+                type="text"
+                value={deployConfig.application}
+                onChange={(e) =>
+                  setDeployConfig((prev) => ({
+                    ...prev,
+                    application: e.target.value,
+                  }))
+                }
+                placeholder="Enter application name"
+              />
+            </div>
+            <div className="form-group">
+              <label>Sub-Application:</label>
+              <input
+                type="text"
+                value={deployConfig.subApplication}
+                onChange={(e) =>
+                  setDeployConfig((prev) => ({
+                    ...prev,
+                    subApplication: e.target.value,
+                  }))
+                }
+                placeholder="Enter sub-application name"
+              />
+            </div>
+            <div className="modal-buttons">
+              <button onClick={() => setShowDeployModal(false)}>Cancel</button>
+              <button onClick={handlePersonalizedDeployConfirm}>Deploy</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
