@@ -431,28 +431,80 @@ h3 {
 }
 
 .workflow-actions {
+  margin: 1.5rem 0;
+  padding: 1rem;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.workflow-menu {
   display: flex;
-  gap: 10px;
-  margin-top: 20px;
-  flex-wrap: wrap;
-  width: 100%;
+  gap: 2rem;
+  justify-content: space-between;
+  align-items: flex-start;
 }
 
-.workflow-actions button {
-  background-color: #4a90e2;
-  color: white;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: background-color 0.3s;
+.menu-section {
   flex: 1;
-  min-width: 150px;
+  min-width: 250px;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
 }
 
-.workflow-actions button:hover {
-  background-color: #357abd;
+.menu-title {
+  margin: 0 0 1rem 0;
+  color: #2c3e50;
+  font-size: 1.1rem;
+  font-weight: 600;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #e9ecef;
+}
+
+.menu-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.menu-buttons .action-button {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background-color: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #495057;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.menu-buttons .action-button:hover {
+  background-color: #e9ecef;
+  border-color: #ced4da;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.menu-buttons .action-button:disabled {
+  background-color: #f8f9fa;
+  color: #adb5bd;
+  cursor: not-allowed;
+  border-color: #e9ecef;
+}
+
+@media (max-width: 1024px) {
+  .workflow-menu {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .menu-section {
+    width: 100%;
+  }
 }
 
 .status-message {
@@ -609,35 +661,18 @@ input[type="file"] {
   .optimal-workflow {
     width: 100%;
   }
-}
 
-.action-button {
-  padding: 10px 20px;
-  background-color: #4a90e2;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: background-color 0.3s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
+  .action-group {
+    flex-direction: column;
+  }
 
-.action-button:hover {
-  background-color: #357abd;
-}
+  .action-button {
+    width: 100%;
+  }
 
-.action-button:disabled {
-  background-color: #cccccc;
-  cursor: not-allowed;
-}
-
-.action-button svg {
-  width: 16px;
-  height: 16px;
+  .action-section {
+    padding: 0.75rem;
+  }
 }
 
 .original-name {
@@ -731,4 +766,198 @@ input[type="file"] {
 
 .modal-buttons button:hover {
   opacity: 0.9;
+}
+
+.workflow-instructions {
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.workflow-instructions h3 {
+  color: #2c3e50;
+  margin-bottom: 15px;
+  font-size: 1.2em;
+}
+
+.workflow-instructions ol {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.workflow-instructions li {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 12px;
+  padding: 8px;
+  background-color: white;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.workflow-instructions .step-number {
+  background-color: #4a90e2;
+  color: white;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+
+.workflow-instructions .step-text {
+  color: #2c3e50;
+  font-size: 0.95em;
+  line-height: 1.4;
+}
+
+.workflow-type-selector {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  justify-content: center;
+}
+
+.workflow-type-button {
+  padding: 10px 20px;
+  border: 2px solid #4a90e2;
+  background-color: white;
+  color: #4a90e2;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  flex: 1;
+  max-width: 150px;
+}
+
+.workflow-type-button:hover {
+  background-color: #f0f7ff;
+}
+
+.workflow-type-button.active {
+  background-color: #4a90e2;
+  color: white;
+}
+
+.workflow-type-button.active:hover {
+  background-color: #357abd;
+}
+
+.technology-selection {
+  margin: 1.5rem 0;
+  padding: 1rem;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.technology-selection h3 {
+  margin: 0 0 1rem 0;
+  color: #2c3e50;
+  font-size: 1.1rem;
+}
+
+.technology-selection-header {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.technology-search {
+  flex: 1;
+  min-width: 200px;
+}
+
+.technology-search input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  transition: border-color 0.2s ease;
+}
+
+.technology-search input:focus {
+  outline: none;
+  border-color: #4a90e2;
+  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.1);
+}
+
+.technology-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.technology-item {
+  padding: 0.75rem;
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.technology-item:hover {
+  background: #e9ecef;
+  border-color: #ced4da;
+  transform: translateY(-1px);
+}
+
+.technology-item.selected {
+  background: #e3f2fd;
+  border-color: #4a90e2;
+  color: #2c3e50;
+}
+
+@media (max-width: 768px) {
+  .technology-selection-header {
+    flex-direction: column;
+  }
+
+  .technology-search {
+    width: 100%;
+  }
+
+  .technology-selection-header .action-button {
+    width: 100%;
+  }
+}
+
+.technology-selection-header .action-button {
+  background-color: #4a90e2;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  font-weight: 500;
+  min-width: 200px;
+  white-space: nowrap;
+}
+
+.technology-selection-header .action-button:hover {
+  background-color: #357abd;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.technology-selection-header .action-button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }

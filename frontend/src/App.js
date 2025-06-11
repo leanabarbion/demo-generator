@@ -14,12 +14,15 @@ function App() {
   const [renamedTechnologies, setRenamedTechnologies] = useState({});
   const [selectedTechnologies, setSelectedTechnologies] = useState([]);
   const [showDeployModal, setShowDeployModal] = useState(false);
+  const [workflowType, setWorkflowType] = useState("new"); // 'new', 'upload', or 'ai'
+  const [showInstructions, setShowInstructions] = useState(true);
   const [deployConfig, setDeployConfig] = useState({
     environment: "saas_dev",
     userCode: "LBA",
     folderName: "DEMGEN_VB",
   });
   const fileInputRef = useRef(null);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const toggleTechnologyInWorkflow = (techName) => {
     setSelectedTechnologies((prev) => {
@@ -472,10 +475,149 @@ function App() {
     );
   };
 
+  const renderInstructions = () => {
+    switch (workflowType) {
+      case "new":
+        return (
+          <div className="workflow-instructions">
+            <h3>Create New Workflow:</h3>
+            <ol>
+              <li>
+                <span className="step-number">1</span>
+                <span className="step-text">
+                  Enter your use case in the text area below
+                </span>
+              </li>
+              <li>
+                <span className="step-number">2</span>
+                <span className="step-text">
+                  Select technologies from the grid below
+                </span>
+              </li>
+              <li>
+                <span className="step-number">3</span>
+                <span className="step-text">
+                  Click "Generate Optimal Order" to determine the best execution
+                  sequence
+                </span>
+              </li>
+              <li>
+                <span className="step-number">4</span>
+                <span className="step-text">
+                  Personalize the workflow names to match your use case
+                </span>
+              </li>
+              <li>
+                <span className="step-number">5</span>
+                <span className="step-text">
+                  Deploy your workflow or download the JSON configuration
+                </span>
+              </li>
+            </ol>
+          </div>
+        );
+      case "upload":
+        return (
+          <div className="workflow-instructions">
+            <h3>Upload Existing Workflow:</h3>
+            <ol>
+              <li>
+                <span className="step-number">1</span>
+                <span className="step-text">
+                  Click "Upload Workflow JSON" to select your workflow file
+                </span>
+              </li>
+              <li>
+                <span className="step-number">2</span>
+                <span className="step-text">
+                  Review the extracted technologies
+                </span>
+              </li>
+              <li>
+                <span className="step-number">3</span>
+                <span className="step-text">
+                  Modify the workflow if needed by adding or removing
+                  technologies
+                </span>
+              </li>
+              <li>
+                <span className="step-number">4</span>
+                <span className="step-text">
+                  Enter your use case in the text area below
+                </span>
+              </li>
+              <li>
+                <span className="step-number">5</span>
+                <span className="step-text">
+                  Generate optimal order or deploy directly
+                </span>
+              </li>
+            </ol>
+          </div>
+        );
+      case "ai":
+        return (
+          <div className="workflow-instructions">
+            <h3>AI-Assisted Workflow Creation:</h3>
+            <ol>
+              <li>
+                <span className="step-number">1</span>
+                <span className="step-text">
+                  Enter your use case in the text area below
+                </span>
+              </li>
+              <li>
+                <span className="step-number">2</span>
+                <span className="step-text">
+                  Click "Ask AI" to get technology suggestions based on your use
+                  case
+                </span>
+              </li>
+              <li>
+                <span className="step-number">3</span>
+                <span className="step-text">
+                  Review and modify the suggested technologies if needed
+                </span>
+              </li>
+              <li>
+                <span className="step-number">4</span>
+                <span className="step-text">
+                  Generate optimal order and personalize workflow names
+                </span>
+              </li>
+              <li>
+                <span className="step-number">5</span>
+                <span className="step-text">
+                  Deploy your workflow or download the JSON configuration
+                </span>
+              </li>
+            </ol>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const handleWorkflowTypeChange = (type) => {
+    if (workflowType === type) {
+      // If clicking the same button, toggle instructions
+      setShowInstructions(!showInstructions);
+    } else {
+      // If clicking a different button, show instructions and change type
+      setWorkflowType(type);
+      setShowInstructions(true);
+    }
+  };
+
   // Add useEffect to monitor state changes
   useEffect(() => {
     console.log("Deployment modal state:", showDeployModal);
   }, [showDeployModal]);
+
+  const filteredTechnologies = selectedTechnologies.filter((tech) =>
+    tech.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div className="app-container">
@@ -483,6 +625,36 @@ function App() {
         {/* LEFT: Title + Use Case + Grid */}
         <div className="left-column">
           <h1>Demonstration Generator</h1>
+
+          <div className="workflow-type-selector">
+            <button
+              className={`workflow-type-button ${
+                workflowType === "new" ? "active" : ""
+              }`}
+              onClick={() => handleWorkflowTypeChange("new")}
+            >
+              Create New
+            </button>
+            <button
+              className={`workflow-type-button ${
+                workflowType === "upload" ? "active" : ""
+              }`}
+              onClick={() => handleWorkflowTypeChange("upload")}
+            >
+              Upload Existing
+            </button>
+            <button
+              className={`workflow-type-button ${
+                workflowType === "ai" ? "active" : ""
+              }`}
+              onClick={() => handleWorkflowTypeChange("ai")}
+            >
+              AI-Assisted
+            </button>
+          </div>
+
+          {showInstructions && renderInstructions()}
+
           <div className="use-case-input">
             <h3>Enter Use Case:</h3>
             <textarea
@@ -491,19 +663,45 @@ function App() {
               placeholder="Describe your use case here..."
               rows="3"
             />
-            <button
-              onClick={generateProposedWorkflow}
-              className="propose-tech-button"
-            >
-              Ask AI to Generate a list of Technologies based on Use Case
-            </button>
           </div>
 
-          <h3>Select your technologies:</h3>
-          <TechnologyGrid
-            selectedIcons={selectedTechnologies}
-            onToggle={toggleTechnologyInWorkflow}
-          />
+          <div className="technology-selection">
+            <h3>Select your technologies</h3>
+            <div className="technology-selection-header">
+              <div className="technology-search">
+                <input
+                  type="text"
+                  placeholder="Search technologies..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <button
+                className="action-button"
+                onClick={generateProposedWorkflow}
+                disabled={!useCase}
+              >
+                Ask AI for Technology Suggestions
+              </button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileUpload}
+                accept=".json"
+                style={{ display: "none" }}
+              />
+              <button
+                className="action-button"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                Upload Workflow JSON
+              </button>
+            </div>
+            <TechnologyGrid
+              selectedIcons={selectedTechnologies}
+              onToggle={toggleTechnologyInWorkflow}
+            />
+          </div>
         </div>
 
         {/* RIGHT: Selected Techs + Optimal Order + Narrative */}
@@ -529,7 +727,10 @@ function App() {
                       </span>
                       <button
                         className="remove-tech"
-                        onClick={() => toggleTechnologyInWorkflow(tech)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleTechnologyInWorkflow(tech);
+                        }}
                         title="Remove technology"
                       >
                         ❌
@@ -559,56 +760,67 @@ function App() {
           </div>
 
           <div className="workflow-actions">
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileUpload}
-              accept=".json"
-              style={{ display: "none" }}
-            />
-            <button
-              className="action-button"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              Upload Workflow JSON
-            </button>
-            <button
-              className="action-button"
-              onClick={generateOptimalOrder}
-              disabled={!selectedTechnologies.length || !useCase}
-            >
-              Generate Optimal Order
-            </button>
-            <button
-              className="action-button"
-              onClick={handlePersonalizeUseCase}
-              disabled={!selectedTechnologies.length || !useCase}
-            >
-              Personalize Workflow to Use Case
-            </button>
-            <button
-              className="action-button"
-              onClick={handleDownloadWorkflow}
-              disabled={!selectedTechnologies.length || !useCase}
-            >
-              Download Workflow JSON
-            </button>
-            <button
-              className="action-button"
-              onClick={handleDeployPersonalizedWorkflow}
-              disabled={
-                !selectedTechnologies.length || !useCase || !renamedTechnologies
-              }
-            >
-              Deploy Personalized Workflow
-            </button>
-            <button
-              className="action-button"
-              onClick={generateNarrative}
-              disabled={!selectedTechnologies.length || !useCase}
-            >
-              Generate Narrative
-            </button>
+            <div className="workflow-menu">
+              {/* Workflow Management Section */}
+              <div className="menu-section">
+                <h4 className="menu-title">Manage Workflow</h4>
+                <div className="menu-buttons">
+                  <button
+                    className="action-button"
+                    onClick={generateOptimalOrder}
+                    disabled={!selectedTechnologies.length || !useCase}
+                  >
+                    Generate Optimal Order
+                  </button>
+                  <button
+                    className="action-button"
+                    onClick={handlePersonalizeUseCase}
+                    disabled={!selectedTechnologies.length || !useCase}
+                  >
+                    Personalize Workflow Names
+                  </button>
+                </div>
+              </div>
+
+              {/* Deployment Section */}
+              <div className="menu-section">
+                <h4 className="menu-title">Deploy or Export</h4>
+                <div className="menu-buttons">
+                  <button
+                    className="action-button"
+                    onClick={handleDownloadWorkflow}
+                    disabled={!selectedTechnologies.length || !useCase}
+                  >
+                    Download Workflow JSON
+                  </button>
+                  <button
+                    className="action-button"
+                    onClick={handleDeployPersonalizedWorkflow}
+                    disabled={
+                      !selectedTechnologies.length ||
+                      !useCase ||
+                      !renamedTechnologies
+                    }
+                  >
+                    Deploy Workflow to Control-M
+                  </button>
+                </div>
+              </div>
+
+              {/* Documentation Section */}
+              <div className="menu-section">
+                <h4 className="menu-title">Documentation</h4>
+                <div className="menu-buttons">
+                  <button
+                    className="action-button"
+                    onClick={generateNarrative}
+                    disabled={!selectedTechnologies.length || !useCase}
+                  >
+                    Generate Documentation
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
 
           {status && <p className="status-message">{status}</p>}
