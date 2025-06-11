@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import "./App.css";
 import TechnologyGrid from "./TechnologyGrid";
 import { marked } from "marked";
@@ -19,6 +19,7 @@ function App() {
     userCode: "LBA",
     folderName: "DEMGEN_VB",
   });
+  const fileInputRef = useRef(null);
 
   const toggleTechnologyInWorkflow = (techName) => {
     setSelectedTechnologies((prev) => {
@@ -273,6 +274,56 @@ function App() {
     setShowDeployModal(true);
   };
 
+  const handleDownloadWorkflow = async () => {
+    if (!selectedTechnologies.length || !useCase) {
+      alert("Please select technologies and enter a use case first.");
+      return;
+    }
+
+    try {
+      setStatus("Preparing workflow download...");
+      const response = await fetch("http://localhost:5000/download_workflow", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          jobs: selectedTechnologies,
+          environment: deployConfig.environment,
+          folder_name: deployConfig.folderName,
+          user_code: deployConfig.userCode,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to download workflow");
+      }
+
+      // Get the blob from the response
+      const blob = await response.blob();
+
+      // Create a download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `workflow_${deployConfig.userCode}_${deployConfig.folderName}.json`;
+      document.body.appendChild(a);
+      a.click();
+
+      // Clean up
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      setStatus("Workflow downloaded successfully!");
+      setTimeout(() => setStatus(""), 3000);
+    } catch (error) {
+      console.error("Download error:", error);
+      setStatus(`Error: ${error.message}`);
+      setTimeout(() => setStatus(""), 3000);
+    }
+  };
+
   const generateProposedWorkflow = async () => {
     if (!useCase.trim()) {
       setStatus("Provide a use case first.");
@@ -373,6 +424,44 @@ function App() {
     }
   };
 
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (!file.name.endsWith(".json")) {
+      alert("Please upload a JSON file");
+      return;
+    }
+
+    try {
+      setStatus("Uploading workflow...");
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("http://localhost:5000/upload_workflow", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to upload workflow");
+      }
+
+      const data = await response.json();
+
+      // Update the selected technologies with the jobs from the uploaded workflow
+      setSelectedTechnologies(data.jobs);
+
+      setStatus("Workflow uploaded successfully!");
+      setTimeout(() => setStatus(""), 3000);
+    } catch (error) {
+      console.error("Upload error:", error);
+      setStatus(`Error: ${error.message}`);
+      setTimeout(() => setStatus(""), 3000);
+    }
+  };
+
   const renderWorkflowItem = (tech, index) => {
     const displayName = renamedTechnologies[tech] || tech;
     return (
@@ -470,6 +559,19 @@ function App() {
           </div>
 
           <div className="workflow-actions">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileUpload}
+              accept=".json"
+              style={{ display: "none" }}
+            />
+            <button
+              className="action-button"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              Upload Workflow JSON
+            </button>
             <button
               className="action-button"
               onClick={generateOptimalOrder}
@@ -484,13 +586,13 @@ function App() {
             >
               Personalize Workflow to Use Case
             </button>
-            {/* <button
+            <button
               className="action-button"
-              onClick={handleDeployWorkflow}
+              onClick={handleDownloadWorkflow}
               disabled={!selectedTechnologies.length || !useCase}
             >
-              Deploy Workflow
-            </button> */}
+              Download Workflow JSON
+            </button>
             <button
               className="action-button"
               onClick={handleDeployPersonalizedWorkflow}
@@ -554,7 +656,7 @@ function App() {
                     userCode: e.target.value,
                   }))
                 }
-                placeholder="Enter user code"
+                placeholder="Enter user code (LBA)"
               />
             </div>
             <div className="form-group">
@@ -568,7 +670,7 @@ function App() {
                     folderName: e.target.value,
                   }))
                 }
-                placeholder="Enter folder name"
+                placeholder="Enter folder name (DEMGEN_VB)"
               />
             </div>
             <div className="form-group">

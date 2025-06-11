@@ -559,5 +559,165 @@ def deploy_personalized_workflow():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/download_workflow', methods=['POST'])
+def download_workflow():
+    data = request.get_json()
+    
+    if not data or 'jobs' not in data:
+        return jsonify({"error": "Missing 'jobs' in request."}), 400
+
+    requested_jobs = data['jobs']
+    environment = data.get('environment', 'saas_dev')
+    folder_name = data.get('folder_name', 'LBA_DEMGEN_VB')
+    user_code = data.get('user_code', 'LBA')
+
+    # Validate environment
+    valid_environments = ['saas_dev', 'saas_preprod', 'saas_prod', 'vse_dev', 'vse_qa', 'vse_prod']
+    if environment not in valid_environments:
+        return jsonify({"error": f"Invalid environment. Must be one of: {valid_environments}"}), 400
+
+    # Set Control-M server based on environment
+    if environment.startswith('saas'):
+        controlm_server = "IN01"
+    elif environment == 'vse_dev':
+        controlm_server = "DEV"
+    elif environment == 'vse_qa':
+        controlm_server = "QA"
+    elif environment == 'vse_prod':
+        controlm_server = "PROD"
+    else:
+        return jsonify({"error": "Invalid environment configuration"}), 400
+
+    # Format folder and application names with user code
+    formatted_folder_name = f"{user_code}_DEMGEN_VB"
+    formatted_application = f"{user_code}-DMO-GEN"
+    formatted_sub_application = f"{user_code}-TEST-APP"
+
+    # ENV & defaults
+    my_env = Environment.create_saas(
+        endpoint=my_secrets[f'{environment}_endpoint'],
+        api_key=my_secrets[f'{environment}_api_key']
+    )
+
+    defaults = WorkflowDefaults(
+        run_as="ctmagent",
+        host="zzz-linux-agents",
+        application=formatted_application,
+        sub_application=formatted_sub_application
+    )
+
+    workflow = Workflow(my_env, defaults=defaults)
+    folder = Folder(formatted_folder_name, site_standard="Empty", controlm_server=controlm_server)
+    workflow.add(folder)
+
+    job_paths = []
+
+    for job_key in requested_jobs:
+        if job_key not in JOB_LIBRARY:
+            return jsonify({"error": f"Unknown job: {job_key}"}), 400
+
+        job = JOB_LIBRARY[job_key]()
+        workflow.add(job, inpath=formatted_folder_name)
+        job_paths.append(f"{formatted_folder_name}/{job.object_name}")
+
+    #Chaining jobs
+    for i in range(len(job_paths) - 1):
+        workflow.connect(job_paths[i], job_paths[i + 1])
+
+    raw_json = workflow.dumps_json()
+    
+    # Return the JSON with appropriate headers for download
+    return Response(
+        raw_json,
+        mimetype='application/json',
+        headers={
+            'Content-Disposition': f'attachment; filename=workflow_{formatted_folder_name}.json'
+        }
+    )
+
+
+@app.route('/upload_workflow', methods=['POST'])
+def upload_workflow():
+    try:
+        app.logger.info("📤 Starting workflow upload process")
+        
+        if 'file' not in request.files:
+            app.logger.error("❌ No file provided in request")
+            return jsonify({"error": "No file provided"}), 400
+        
+        file = request.files['file']
+        app.logger.info(f"📄 Received file: {file.filename}")
+        
+        if file.filename == '':
+            app.logger.error("❌ Empty filename")
+            return jsonify({"error": "No file selected"}), 400
+        
+        if not file.filename.endswith('.json'):
+            app.logger.error(f"❌ Invalid file type: {file.filename}")
+            return jsonify({"error": "File must be a JSON file"}), 400
+
+        # Read and parse the JSON file
+        try:
+            file_content = file.read().decode('utf-8')
+            app.logger.info(f"📝 Raw file content: {file_content[:500]}...")  # Log first 500 chars
+            
+            workflow_data = json.loads(file_content)
+            app.logger.info(f"✅ Successfully parsed JSON: {json.dumps(workflow_data, indent=2)}")
+        except json.JSONDecodeError as e:
+            app.logger.error(f"❌ JSON parsing error: {str(e)}")
+            return jsonify({"error": "Invalid JSON file"}), 400
+
+        # Validate the workflow structure
+        if not isinstance(workflow_data, dict):
+            app.logger.error(f"❌ Invalid workflow format: {type(workflow_data)}")
+            return jsonify({"error": "Invalid workflow format"}), 400
+
+        # Extract job information from object names
+        jobs = []
+        folder_name = next(iter(workflow_data.keys()))  # Get the folder name
+        app.logger.info(f"🔍 Processing folder: {folder_name}")
+        
+        # Get all keys that start with 'zzt-'
+        object_names = [key for key in workflow_data[folder_name].keys() if key.startswith('zzt-')]
+        app.logger.info(f"📋 Found object names: {object_names}")
+
+        # Validate each object name against JOB_LIBRARY
+        for obj_name in object_names:
+            # Remove the 'zzt-' prefix to get the base name
+            base_name = obj_name[4:]  # Remove 'zzt-' prefix
+            app.logger.info(f"🔍 Checking object name: {obj_name} (base name: {base_name})")
+            
+            # Find matching job in JOB_LIBRARY
+            found_job = None
+            for job_name, job_class in JOB_LIBRARY.items():
+                # Create an instance of the job to check its object_name
+                job_instance = job_class()
+                if job_instance.object_name == obj_name:
+                    found_job = job_name
+                    break
+            
+            if found_job:
+                app.logger.info(f"✅ Found matching job: {found_job} for object name: {obj_name}")
+                jobs.append(found_job)
+            else:
+                app.logger.warning(f"⚠️ No matching job found for object name: {obj_name}")
+
+        if not jobs:
+            app.logger.error("❌ No valid jobs found in workflow")
+            return jsonify({"error": "No valid jobs found in the workflow"}), 400
+
+        app.logger.info(f"✅ Successfully extracted {len(jobs)} jobs: {jobs}")
+        
+        return jsonify({
+            "message": "Workflow uploaded successfully",
+            "jobs": jobs,
+            "workflow_data": workflow_data
+        }), 200
+
+    except Exception as e:
+        app.logger.error(f"❌ Error processing workflow upload: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == '__main__':
     app.run(debug=True)
