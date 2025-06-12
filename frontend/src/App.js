@@ -534,6 +534,44 @@ function App() {
             </ol>
           </div>
         );
+      case "templates":
+        return (
+          <div className="workflow-instructions">
+            <h3>Use Templates:</h3>
+            <ol>
+              <li>
+                <span className="step-number">1</span>
+                <span className="step-text">
+                  Click "Browse Templates" to view available templates
+                </span>
+              </li>
+              <li>
+                <span className="step-number">2</span>
+                <span className="step-text">
+                  Select a template to use or manage
+                </span>
+              </li>
+              <li>
+                <span className="step-number">3</span>
+                <span className="step-text">
+                  Use the template to create a new workflow
+                </span>
+              </li>
+              <li>
+                <span className="step-number">4</span>
+                <span className="step-text">
+                  Update or delete templates as needed
+                </span>
+              </li>
+              <li>
+                <span className="step-number">5</span>
+                <span className="step-text">
+                  Save new templates from your workflows
+                </span>
+              </li>
+            </ol>
+          </div>
+        );
       case "upload":
         return (
           <div className="workflow-instructions">
@@ -586,8 +624,8 @@ function App() {
               <li>
                 <span className="step-number">2</span>
                 <span className="step-text">
-                  Click "Ask AI" to get technology suggestions based on your use
-                  case
+                  Click "Ask AI for Technologies Suggestions" to get technology
+                  suggestions based on your use case
                 </span>
               </li>
               <li>
@@ -937,6 +975,14 @@ function App() {
             </button>
             <button
               className={`workflow-type-button ${
+                workflowType === "templates" ? "active" : ""
+              }`}
+              onClick={() => handleWorkflowTypeChange("templates")}
+            >
+              Use Templates
+            </button>
+            <button
+              className={`workflow-type-button ${
                 workflowType === "upload" ? "active" : ""
               }`}
               onClick={() => handleWorkflowTypeChange("upload")}
@@ -949,7 +995,7 @@ function App() {
               }`}
               onClick={() => handleWorkflowTypeChange("ai")}
             >
-              AI-Assisted
+              Ask AI
             </button>
           </div>
 
