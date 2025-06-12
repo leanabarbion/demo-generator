@@ -14,6 +14,12 @@ function App() {
   const [renamedTechnologies, setRenamedTechnologies] = useState({});
   const [selectedTechnologies, setSelectedTechnologies] = useState([]);
   const [showDeployModal, setShowDeployModal] = useState(false);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [showUseTemplateModal, setShowUseTemplateModal] = useState(false);
+  const [templateName, setTemplateName] = useState("");
+  const [templateCategory, setTemplateCategory] = useState("");
+  const [templates, setTemplates] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState("");
   const [workflowType, setWorkflowType] = useState("new"); // 'new', 'upload', or 'ai'
   const [showInstructions, setShowInstructions] = useState(true);
   const [deployConfig, setDeployConfig] = useState({
@@ -23,6 +29,18 @@ function App() {
   });
   const fileInputRef = useRef(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [existingTemplateId, setExistingTemplateId] = useState(null);
+  const [confirmAction, setConfirmAction] = useState(null);
+
+  const categories = [
+    "Banking, Financial Services, Insurance",
+    "Telecommunication",
+    "Consumer Goods",
+    "Manufacturing & Industrial Automation",
+    "Retail",
+    "Travel, Transportation & Logistics",
+  ];
 
   const toggleTechnologyInWorkflow = (techName) => {
     setSelectedTechnologies((prev) => {
@@ -524,26 +542,25 @@ function App() {
               <li>
                 <span className="step-number">1</span>
                 <span className="step-text">
-                  Click "Upload Workflow JSON" to select your workflow file
+                  Enter your use case in the text area below
                 </span>
               </li>
               <li>
                 <span className="step-number">2</span>
                 <span className="step-text">
-                  Review the extracted technologies
+                  Upload your workflow JSON file
                 </span>
               </li>
               <li>
                 <span className="step-number">3</span>
                 <span className="step-text">
-                  Modify the workflow if needed by adding or removing
-                  technologies
+                  Review the extracted technologies technologies
                 </span>
               </li>
               <li>
                 <span className="step-number">4</span>
                 <span className="step-text">
-                  Enter your use case in the text area below
+                  Modify the workflow if needed by adding or removing
                 </span>
               </li>
               <li>
@@ -619,6 +636,289 @@ function App() {
     tech.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const handleSaveAsTemplate = async () => {
+    console.log("🔍 handleSaveAsTemplate called");
+    console.log("Current states:", {
+      templateName,
+      templateCategory,
+      showTemplateModal,
+      showConfirmModal,
+      selectedTechnologies,
+      optimalOrder,
+      useCase,
+      narrative,
+      renamedTechnologies,
+      deployConfig,
+    });
+
+    if (!templateName || !templateCategory) {
+      console.log("❌ Missing required fields:", {
+        templateName,
+        templateCategory,
+      });
+      setStatus("Please enter both template name and category");
+      return;
+    }
+
+    console.log("🔍 Checking for existing template...");
+    try {
+      const response = await fetch(
+        "http://localhost:5000/check_template_exists",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: templateName,
+            category: templateCategory,
+          }),
+        }
+      );
+
+      const result = await response.json();
+      console.log("📝 Template check response:", result);
+
+      if (result.exists) {
+        console.log("⚠️ Template exists, showing confirmation modal");
+        console.log("Template details:", {
+          templateId: result.templateId,
+          name: templateName,
+          category: templateCategory,
+        });
+        setExistingTemplateId(result.templateId);
+        setShowConfirmModal(true);
+      } else {
+        console.log("✅ No existing template found, proceeding with save");
+        await saveTemplate();
+      }
+    } catch (error) {
+      console.error("❌ Error checking template existence:", error);
+      setStatus("Error checking template existence");
+    }
+  };
+
+  const saveTemplate = async () => {
+    console.log("🔍 saveTemplate called");
+    console.log("📦 Data being saved:", {
+      name: templateName,
+      category: templateCategory,
+      technologies: selectedTechnologies,
+      workflowOrder: optimalOrder,
+      useCase: useCase,
+      narrative: narrative,
+      renamedTechnologies: renamedTechnologies,
+      environment: deployConfig.environment,
+      userCode: deployConfig.userCode,
+      folderName: deployConfig.folderName,
+      application: deployConfig.application,
+      subApplication: deployConfig.subApplication,
+    });
+
+    try {
+      const response = await fetch("http://localhost:5000/save_template", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: templateName,
+          category: templateCategory,
+          technologies: selectedTechnologies,
+          workflowOrder: optimalOrder,
+          useCase: useCase,
+          narrative: narrative,
+          renamedTechnologies: renamedTechnologies,
+          environment: deployConfig.environment,
+          userCode: deployConfig.userCode,
+          folderName: deployConfig.folderName,
+          application: deployConfig.application,
+          subApplication: deployConfig.subApplication,
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log("✅ Template saved successfully:", result);
+        setShowTemplateModal(false);
+        setTemplateName("");
+        setTemplateCategory("");
+        setStatus("Template saved successfully!");
+      } else {
+        const error = await response.json();
+        console.error("❌ Error saving template:", error);
+        setStatus(`Error saving template: ${error.error}`);
+      }
+    } catch (error) {
+      console.error("❌ Error in saveTemplate:", error);
+      setStatus("Error saving template");
+    }
+  };
+
+  const handleConfirmAction = async (action) => {
+    console.log("🔍 handleConfirmAction called with action:", action);
+    console.log("Current states:", {
+      confirmAction: action,
+      existingTemplateId,
+      showTemplateModal,
+      showConfirmModal,
+      templateName,
+      templateCategory,
+      selectedTechnologies,
+      optimalOrder,
+      useCase,
+      narrative,
+      renamedTechnologies,
+      deployConfig,
+    });
+
+    try {
+      if (action === "update") {
+        console.log("🔄 Updating existing template...");
+        console.log("📦 Data being updated:", {
+          templateId: existingTemplateId,
+          name: templateName,
+          category: templateCategory,
+          technologies: selectedTechnologies,
+          workflowOrder: optimalOrder,
+          useCase: useCase,
+          narrative: narrative,
+          renamedTechnologies: renamedTechnologies,
+          environment: deployConfig.environment,
+          userCode: deployConfig.userCode,
+          folderName: deployConfig.folderName,
+          application: deployConfig.application,
+          subApplication: deployConfig.subApplication,
+        });
+
+        // Close both modals immediately
+        console.log("Closing modals...");
+        setShowTemplateModal(false);
+        setShowConfirmModal(false);
+
+        // Update the existing template
+        const response = await fetch("http://localhost:5000/update_template", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            templateId: existingTemplateId,
+            name: templateName,
+            category: templateCategory,
+            technologies: selectedTechnologies,
+            workflowOrder: optimalOrder,
+            useCase: useCase,
+            narrative: narrative,
+            renamedTechnologies: renamedTechnologies,
+            environment: deployConfig.environment,
+            userCode: deployConfig.userCode,
+            folderName: deployConfig.folderName,
+            application: deployConfig.application,
+            subApplication: deployConfig.subApplication,
+          }),
+        });
+
+        console.log("📝 Update response status:", response.status);
+
+        if (!response.ok) {
+          const error = await response.json();
+          console.error("❌ Update failed:", error);
+          throw new Error(error.error || "Failed to update template");
+        }
+
+        const result = await response.json();
+        console.log("✅ Template updated successfully:", result);
+        console.log("Resetting states after successful update");
+
+        // Reset states after successful update
+        setTemplateName("");
+        setTemplateCategory("");
+        setExistingTemplateId(null);
+        setConfirmAction(null);
+        setStatus("Template updated successfully!");
+      } else if (action === "new") {
+        console.log("🆕 Creating new template with modified name...");
+        // Generate a new name by appending a timestamp
+        const newName = `${templateName}_${Date.now()}`;
+        console.log("New template name:", newName);
+        setTemplateName(newName);
+        await saveTemplate();
+      }
+    } catch (error) {
+      console.error("❌ Error in handleConfirmAction:", error);
+      setStatus(error.message || "Error updating template");
+      // Reopen the modals on error
+      console.log("Reopening modals due to error");
+      setShowTemplateModal(true);
+      setShowConfirmModal(true);
+    }
+  };
+
+  const handleUseTemplate = async () => {
+    console.log("🔍 handleUseTemplate called - fetching templates");
+    try {
+      const response = await fetch("http://localhost:5000/list_templates");
+      if (!response.ok) {
+        throw new Error("Failed to fetch templates");
+      }
+      const data = await response.json();
+      console.log("📦 Templates fetched:", data.templates);
+      setTemplates(data.templates);
+      setShowUseTemplateModal(true);
+    } catch (error) {
+      console.error("❌ Error fetching templates:", error);
+      setStatus("Error loading templates: " + error.message);
+    }
+  };
+
+  const handleLoadTemplate = (template) => {
+    console.log("🔍 handleLoadTemplate called with template:", template);
+    setSelectedTechnologies(template.technologies);
+    setOptimalOrder(template.workflowOrder);
+    setUseCase(template.useCase);
+    setNarrative(template.narrative);
+    setRenamedTechnologies(template.renamedTechnologies);
+    setDeployConfig({
+      environment: template.environment || "saas_dev",
+      userCode: template.userCode || "LBA",
+      folderName: template.folderName || "DEMGEN_VB",
+      application: template.application || "DMO-GEN",
+      subApplication: template.subApplication || "TEST-APP",
+    });
+    setShowUseTemplateModal(false);
+    setStatus("Template loaded successfully!");
+  };
+
+  const handleDeleteTemplate = async (templateId) => {
+    try {
+      const response = await fetch("http://localhost:5000/delete_template", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ templateId }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete template");
+      }
+
+      // Remove the template from the local state
+      setTemplates(
+        templates.filter((template) => template.templateId !== templateId)
+      );
+      setStatus("Template deleted successfully");
+    } catch (error) {
+      console.error("Error deleting template:", error);
+      setStatus("Error deleting template: " + error.message);
+    }
+  };
+
+  const filteredTemplates = selectedCategory
+    ? templates.filter((template) => template.category === selectedCategory)
+    : templates;
+
   return (
     <div className="app-container">
       <div className="content-container">
@@ -655,14 +955,30 @@ function App() {
 
           {showInstructions && renderInstructions()}
 
-          <div className="use-case-input">
-            <h3>Enter Use Case:</h3>
-            <textarea
-              value={useCase}
-              onChange={(e) => setUseCase(e.target.value)}
-              placeholder="Describe your use case here..."
-              rows="3"
-            />
+          <div className="use-case-section">
+            <h3>Start Your Workflow</h3>
+            <div className="use-case-options">
+              <div className="option-card new-use-case">
+                <h4>Enter New Use Case</h4>
+                <p>Describe your specific workflow requirements</p>
+                <textarea
+                  value={useCase}
+                  onChange={(e) => setUseCase(e.target.value)}
+                  placeholder="Describe your use case..."
+                  rows="3"
+                />
+              </div>
+              <div className="option-card template-option">
+                <h4>Use Existing Template</h4>
+                <p>Start from a pre-configured workflow template</p>
+                <button
+                  className="action-button template-button"
+                  onClick={handleUseTemplate}
+                >
+                  Browse Templates
+                </button>
+              </div>
+            </div>
           </div>
 
           <div className="technology-selection">
@@ -804,6 +1120,15 @@ function App() {
                   >
                     Deploy Workflow to Control-M
                   </button>
+                  <button
+                    className="action-button"
+                    onClick={() => {
+                      setShowTemplateModal(true);
+                    }}
+                    disabled={!selectedTechnologies.length || !useCase}
+                  >
+                    Save as Template
+                  </button>
                 </div>
               </div>
 
@@ -916,6 +1241,164 @@ function App() {
             <div className="modal-buttons">
               <button onClick={() => setShowDeployModal(false)}>Cancel</button>
               <button onClick={handlePersonalizedDeployConfirm}>Deploy</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Template Save Modal */}
+      {showTemplateModal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h2>Save as Template</h2>
+            <div className="modal-form">
+              <div className="form-group">
+                <label>Template Name:</label>
+                <input
+                  type="text"
+                  value={templateName}
+                  onChange={(e) => setTemplateName(e.target.value)}
+                  placeholder="Enter template name"
+                />
+              </div>
+              <div className="form-group">
+                <label>Category:</label>
+                <select
+                  value={templateCategory}
+                  onChange={(e) => setTemplateCategory(e.target.value)}
+                >
+                  <option value="">Select a category</option>
+                  {categories.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="modal-actions">
+                <button onClick={() => setShowTemplateModal(false)}>
+                  Cancel
+                </button>
+                <button onClick={handleSaveAsTemplate}>Save Template</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h2>Template Already Exists</h2>
+            <p>
+              A template with this name and category already exists. What would
+              you like to do?
+            </p>
+            <div className="modal-actions">
+              <button
+                onClick={() => {
+                  console.log("Update button clicked");
+                  handleConfirmAction("update");
+                }}
+              >
+                Update Existing Template
+              </button>
+              <button
+                onClick={() => {
+                  console.log("New button clicked");
+                  handleConfirmAction("new");
+                }}
+              >
+                Create New Template
+              </button>
+              <button
+                onClick={() => {
+                  console.log("Cancel button clicked");
+                  setShowConfirmModal(false);
+                  setConfirmAction(null);
+                  setExistingTemplateId(null);
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Use Template Modal */}
+      {showUseTemplateModal && (
+        <div className="modal-overlay">
+          <div className="modal-content template-modal">
+            <h3>Select a Template</h3>
+            <div className="template-categories">
+              <button
+                className={`category-button ${
+                  !selectedCategory ? "active" : ""
+                }`}
+                onClick={() => setSelectedCategory("")}
+              >
+                All Categories
+              </button>
+              {categories.map((category) => (
+                <button
+                  key={category}
+                  className={`category-button ${
+                    selectedCategory === category ? "active" : ""
+                  }`}
+                  onClick={() => setSelectedCategory(category)}
+                >
+                  {category}
+                </button>
+              ))}
+            </div>
+            <div className="template-list">
+              {filteredTemplates.length > 0 ? (
+                filteredTemplates.map((template) => (
+                  <div key={template.templateId} className="template-card">
+                    <h4>{template.name}</h4>
+                    <p className="template-category">{template.category}</p>
+                    <p className="template-description">
+                      {template.description}
+                    </p>
+                    <div className="template-technologies">
+                      <strong>Technologies:</strong>
+                      <div className="tech-tags">
+                        {template.technologies.map((tech) => (
+                          <span key={tech} className="tech-tag">
+                            {tech}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <button
+                      className="action-button"
+                      onClick={() => handleLoadTemplate(template)}
+                    >
+                      Use This Template
+                    </button>
+                    <button
+                      className="action-button placeholder-button"
+                      onClick={() => handleDeleteTemplate(template.templateId)}
+                    >
+                      Delete Template
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <p className="no-templates">
+                  No templates found in this category
+                </p>
+              )}
+            </div>
+            <div className="modal-actions">
+              <button
+                className="action-button"
+                onClick={() => setShowUseTemplateModal(false)}
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>

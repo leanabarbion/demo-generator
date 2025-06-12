@@ -11,6 +11,8 @@ from dotenv import load_dotenv
 import json
 from openai import AzureOpenAI  
 from job_library import JOB_LIBRARY
+import time
+from datetime import datetime
 
 load_dotenv()
 # Load Azure OpenAI credentials from .env
@@ -236,14 +238,40 @@ def generate_narrative():
                         {
                             "role": "system",
                             "content": """You are an AI assistant that generates structured, professional narratives for BMC Control-M workflows.
-                            Your response must follow this exact structure:
-                            1. Workflow Name: A concise, descriptive name based on the use case
-                            2. Introduction: A brief overview of the workflow's purpose
-                            3. Use Case Overview: High-level description of the business need
-                            4. Use Case Technical Explanation: Detailed technical explanation of how the workflow operates
-                            5. Job Types Included: List and description of each technology in the workflow
+                            Your response must follow this exact structure and formatting:
                             
-                            Format your response with clear section headers and professional, technical language."""
+                            # Workflow Name
+                            [A concise, descriptive name based on the use case]
+
+                            ## Introduction
+                            [A brief overview of the workflow's purpose and business value]
+
+                            ## Use Case Overview
+                            [High-level description of the business need and objectives]
+
+                            ## Technical Implementation
+                            [Detailed technical explanation of how the workflow operates, including:
+                            - Data flow between jobs
+                            - Dependencies and relationships
+                            - Error handling and recovery
+                            - Performance considerations]
+
+                            ## Job Types and Technologies
+                            [List and description of each technology in the workflow:
+                            1. [Technology Name]
+                               - Purpose: [Brief description]
+                               - Role: [How it fits in the workflow]
+                               - Configuration: [Key settings or parameters]
+                            
+                            2. [Technology Name]
+                               - Purpose: [Brief description]
+                               - Role: [How it fits in the workflow]
+                               - Configuration: [Key settings or parameters]
+                            
+                            And so on for each technology...]
+
+                            Format your response with clear section headers and professional, technical language.
+                            Use markdown formatting for better readability."""
                         },
                         {
                             "role": "user",
@@ -716,6 +744,207 @@ def upload_workflow():
 
     except Exception as e:
         app.logger.error(f"❌ Error processing workflow upload: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/save_template', methods=['POST'])
+def save_template():
+    try:
+        data = request.json
+        app.logger.info(f"📝 Saving template: {json.dumps(data, indent=2)}")
+        
+        # Validate required fields
+        required_fields = ['name', 'technologies', 'workflowOrder', 'useCase']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({"error": f"Missing required field: {field}"}), 400
+
+        # Generate a unique template ID
+        template_id = f"template_{int(time.time())}"
+        
+        # Add metadata and all workflow information
+        template_data = {
+            "templateId": template_id,
+            "createdDate": datetime.now().isoformat(),
+            "lastModified": datetime.now().isoformat(),
+            "name": data.get('name'),
+            "category": data.get('category'),
+            "technologies": data.get('technologies', []),
+            "workflowOrder": data.get('workflowOrder', []),
+            "useCase": data.get('useCase'),
+            "narrative": data.get('narrative', ''),
+            "renamedTechnologies": data.get('renamedTechnologies', {}),
+            "environment": data.get('environment', 'saas_dev'),
+            "userCode": data.get('userCode', 'LBA'),
+            "folderName": data.get('folderName', 'DEMGEN_VB'),
+            "application": data.get('application', 'DMO-GEN'),
+            "subApplication": data.get('subApplication', 'TEST-APP')
+        }
+
+        # Save template to a JSON file
+        templates_dir = "templates"
+        if not os.path.exists(templates_dir):
+            os.makedirs(templates_dir)
+
+        template_file = os.path.join(templates_dir, f"{template_id}.json")
+        with open(template_file, 'w') as f:
+            json.dump(template_data, f, indent=2)
+
+        app.logger.info(f"✅ Template saved successfully: {template_id}")
+        return jsonify({
+            "message": "Template saved successfully",
+            "templateId": template_id
+        }), 200
+
+    except Exception as e:
+        app.logger.error(f"❌ Error saving template: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/list_templates', methods=['GET'])
+def list_templates():
+    try:
+        app.logger.info("📋 Listing templates")
+        
+        templates_dir = "templates"
+        if not os.path.exists(templates_dir):
+            return jsonify({"templates": []}), 200
+
+        templates = []
+        for filename in os.listdir(templates_dir):
+            if filename.endswith('.json'):
+                try:
+                    with open(os.path.join(templates_dir, filename), 'r') as f:
+                        template_data = json.load(f)
+                        templates.append(template_data)
+                except Exception as e:
+                    app.logger.error(f"❌ Error reading template {filename}: {str(e)}")
+                    continue
+
+        # Sort templates by last modified date
+        templates.sort(key=lambda x: x.get('lastModified', ''), reverse=True)
+        
+        app.logger.info(f"✅ Found {len(templates)} templates")
+        return jsonify({"templates": templates}), 200
+
+    except Exception as e:
+        app.logger.error(f"❌ Error listing templates: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/delete_template', methods=['POST'])
+def delete_template():
+    try:
+        data = request.json
+        template_id = data.get('templateId')
+        
+        if not template_id:
+            return jsonify({"error": "Template ID is required"}), 400
+
+        app.logger.info(f"🗑️ Deleting template: {template_id}")
+        
+        template_file = os.path.join("templates", f"{template_id}.json")
+        
+        if not os.path.exists(template_file):
+            return jsonify({"error": "Template not found"}), 404
+
+        os.remove(template_file)
+        app.logger.info(f"✅ Template deleted successfully: {template_id}")
+        
+        return jsonify({"message": "Template deleted successfully"}), 200
+
+    except Exception as e:
+        app.logger.error(f"❌ Error deleting template: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/check_template_exists', methods=['POST'])
+def check_template_exists():
+    try:
+        data = request.json
+        template_name = data.get('name')
+        template_category = data.get('category')
+        
+        if not template_name or not template_category:
+            return jsonify({"error": "Template name and category are required"}), 400
+
+        app.logger.info(f"🔍 Checking for existing template: {template_name} in category: {template_category}")
+        
+        templates_dir = "templates"
+        if not os.path.exists(templates_dir):
+            return jsonify({"exists": False}), 200
+
+        for filename in os.listdir(templates_dir):
+            if filename.endswith('.json'):
+                try:
+                    with open(os.path.join(templates_dir, filename), 'r') as f:
+                        template_data = json.load(f)
+                        if (template_data.get('name') == template_name and 
+                            template_data.get('category') == template_category):
+                            return jsonify({
+                                "exists": True,
+                                "templateId": template_data.get('templateId')
+                            }), 200
+                except Exception as e:
+                    app.logger.error(f"❌ Error reading template {filename}: {str(e)}")
+                    continue
+
+        return jsonify({"exists": False}), 200
+
+    except Exception as e:
+        app.logger.error(f"❌ Error checking template existence: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/update_template', methods=['POST'])
+def update_template():
+    try:
+        data = request.json
+        template_id = data.get('templateId')
+        
+        if not template_id:
+            return jsonify({"error": "Template ID is required"}), 400
+
+        app.logger.info(f"📝 Updating template: {template_id}")
+        
+        # Load existing template to preserve metadata
+        template_file = os.path.join("templates", f"{template_id}.json")
+        if not os.path.exists(template_file):
+            return jsonify({"error": "Template not found"}), 404
+
+        with open(template_file, 'r') as f:
+            existing_template = json.load(f)
+
+        # Update template data while preserving metadata
+        updated_template = {
+            **existing_template,  # Keep existing metadata
+            "name": data.get('name'),
+            "category": data.get('category'),
+            "technologies": data.get('technologies'),
+            "workflowOrder": data.get('workflowOrder'),
+            "useCase": data.get('useCase'),
+            "narrative": data.get('narrative'),
+            "renamedTechnologies": data.get('renamedTechnologies'),
+            "environment": data.get('environment'),
+            "userCode": data.get('userCode'),
+            "folderName": data.get('folderName'),
+            "application": data.get('application'),
+            "subApplication": data.get('subApplication'),
+            "lastModified": datetime.now().isoformat()  # Update last modified date
+        }
+
+        # Save updated template
+        with open(template_file, 'w') as f:
+            json.dump(updated_template, f, indent=2)
+
+        app.logger.info(f"✅ Template updated successfully: {template_id}")
+        return jsonify({
+            "message": "Template updated successfully",
+            "templateId": template_id
+        }), 200
+
+    except Exception as e:
+        app.logger.error(f"❌ Error updating template: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 
