@@ -40,10 +40,10 @@ def generate_workflow():
     if not data or 'jobs' not in data:
         return jsonify({"error": "Missing 'jobs' in request."}), 400
 
-    requested_jobs = data['jobs']
-    environment = data.get('environment', 'saas_dev')  # Default to saas_dev if not specified
+    jobs_data = data['jobs']
+    environment = data.get('environment', 'saas_dev')
     folder_name = data.get('folder_name', 'LBA_DEMGEN_VB')
-    user_code = data.get('user_code', 'LBA')  # Default to LBA if not specified
+    user_code = data.get('user_code', 'LBA')
 
     # Validate environment
     valid_environments = ['saas_dev', 'saas_preprod', 'saas_prod', 'vse_dev', 'vse_qa', 'vse_prod']
@@ -63,7 +63,7 @@ def generate_workflow():
         return jsonify({"error": "Invalid environment configuration"}), 400
 
     # Format folder and application names with user code
-    formatted_folder_name = f"{user_code}_DEMGEN_VB"
+    formatted_folder_name = f"{user_code}_{folder_name}"
     formatted_application = f"{user_code}-DMO-GEN"
     formatted_sub_application = f"{user_code}-TEST-APP"
 
@@ -84,46 +84,126 @@ def generate_workflow():
     folder = Folder(formatted_folder_name, site_standard="Empty", controlm_server=controlm_server)
     workflow.add(folder)
 
-    job_paths = []
+    # Group jobs by y-coordinate to identify concurrent jobs
+    y_coordinates = {}
+    for job_data in jobs_data:
+        y = job_data['position']['y']
+        if y not in y_coordinates:
+            y_coordinates[y] = []
+        y_coordinates[y].append(job_data)
 
-    for job_key in requested_jobs:
-        if job_key not in JOB_LIBRARY:
-            return jsonify({"error": f"Unknown job: {job_key}"}), 400
+    # Create concurrent groups
+    concurrent_groups = []
+    for y, jobs_at_y in y_coordinates.items():
+        if len(jobs_at_y) > 1:
+            concurrent_groups.append({
+                'id': f'group_{y}',
+                'jobs': [job['id'] for job in jobs_at_y]
+            })
 
-        job = JOB_LIBRARY[job_key]()
+    # Process jobs and create dependencies
+    job_instances = {}
+    dependencies = []
+
+    for job_data in jobs_data:
+        job_id = job_data['id']
+        job_type = job_data['type']
+        
+        if job_type not in JOB_LIBRARY:
+            return jsonify({"error": f"Unknown job type: {job_type}"}), 400
+
+        # Create job instance
+        job = JOB_LIBRARY[job_type]()
+        job.object_name = f"zzt-{job_data['name']}"
         workflow.add(job, inpath=formatted_folder_name)
-        job_paths.append(f"{formatted_folder_name}/{job.object_name}")
+        job_instances[job_id] = job
 
-    #Chaining jobs
-    for i in range(len(job_paths) - 1):
-        workflow.connect(job_paths[i], job_paths[i + 1])
+        # Handle dependencies
+        if job_data['dependencies']:
+            dependencies.append({
+                'job': job_id,
+                'depends_on': job_data['dependencies']
+            })
+            # Add wait events for dependencies
+            wait_events = [Event(event=f"{dep}_COMPLETE") for dep in job_data['dependencies']]
+            job.wait_for_events.append(WaitForEvents(wait_events))
+
+    # Add completion events for concurrent groups
+    for group in concurrent_groups:
+        completion_event = f"{group['id']}_COMPLETE"
+        for job_id in group['jobs']:
+            if job_id in job_instances:
+                job_instances[job_id].events_to_add.append(AddEvents([Event(event=completion_event)]))
+
+    # Connect jobs based on dependencies
+    for dep in dependencies:
+        for dep_id in dep['depends_on']:
+            if dep_id in job_instances and dep['job'] in job_instances:
+                workflow.connect(
+                    f"{formatted_folder_name}/{job_instances[dep_id].object_name}",
+                    f"{formatted_folder_name}/{job_instances[dep['job']].object_name}"
+                )
 
     raw_json = workflow.dumps_json()
-    print(raw_json)
+
+    # Save JSON to output.json
+    output_file = "output.json"
+    with open(output_file, "w") as f:
+        f.write(raw_json)
 
     # Check for build and deploy errors
     build_errors = workflow.build().errors
     deploy_errors = workflow.deploy().errors
 
-    print(build_errors)
-    print(deploy_errors)
-
-    # If no errors, save JSON and run CLI commands
+    # If no errors, run CLI commands
+    deployment_status = {"success": False, "message": "", "errors": []}
+    
     if build_errors is None and deploy_errors is None:
-        # Save JSON to output.json
-        with open("output.json", "w") as f:
-            f.write(raw_json)
-        print("Workflow JSON saved to output.json")
-
-        # Run the Control-M CLI commands
         try:
-            subprocess.run(["ctm", "build", "output.json"], check=True)
-            subprocess.run(["ctm", "deploy", "output.json"], check=True)
-            print("Build and deploy commands executed successfully.")
+            # Run the Control-M CLI commands
+            build_result = subprocess.run(["ctm", "build", output_file], capture_output=True, text=True, check=True)
+            deploy_result = subprocess.run(["ctm", "deploy", output_file], capture_output=True, text=True, check=True)
+            
+            deployment_status = {
+                "success": True,
+                "message": "Workflow successfully built and deployed",
+                "build_output": build_result.stdout,
+                "deploy_output": deploy_result.stdout
+            }
         except subprocess.CalledProcessError as e:
-            print(f"An error occurred while running Control-M commands: {e}")
+            deployment_status = {
+                "success": False,
+                "message": f"Error during deployment: {str(e)}",
+                "errors": [e.stderr] if e.stderr else []
+            }
+    else:
+        deployment_status = {
+            "success": False,
+            "message": "Workflow validation failed",
+            "errors": [build_errors, deploy_errors]
+        }
 
-    return Response(raw_json, mimetype='application/json')
+    # Prepare response
+    response = {
+        "workflow": {
+            "name": formatted_folder_name,
+            "jobs": [
+                {
+                    "id": job_id,
+                    "name": job_data['name'],
+                    "type": job_data['type'],
+                    "object_name": job_instances[job_id].object_name
+                }
+                for job_id, job_data in zip(job_instances.keys(), jobs_data)
+            ],
+            "concurrent_groups": concurrent_groups,
+            "dependencies": dependencies
+        },
+        "deployment": deployment_status,
+        "raw_json": raw_json
+    }
+
+    return jsonify(response), 200
 
 
 @app.route("/generate_optimal_order", methods=["POST"])
@@ -257,17 +337,11 @@ def generate_narrative():
                             - Performance considerations]
 
                             ## Job Types and Technologies
-                            [List and description of each technology in the workflow:
+                            [List of the Job Types in the workflow:
                             1. [Technology Name]
-                               - Purpose: [Brief description]
-                               - Role: [How it fits in the workflow]
-                               - Configuration: [Key settings or parameters]
                             
                             2. [Technology Name]
-                               - Purpose: [Brief description]
-                               - Role: [How it fits in the workflow]
-                               - Configuration: [Key settings or parameters]
-                            
+
                             And so on for each technology...]
 
                             Format your response with clear section headers and professional, technical language.
