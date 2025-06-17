@@ -3,6 +3,7 @@ import "./App.css";
 import TechnologyGrid from "./TechnologyGrid";
 import { marked } from "marked";
 import { JOB_LIBRARY } from "./jobLibrary";
+import techCategories from "./categories";
 
 function App() {
   const [workflow, setWorkflow] = useState([]);
@@ -16,6 +17,7 @@ function App() {
   const [showDeployModal, setShowDeployModal] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [showUseTemplateModal, setShowUseTemplateModal] = useState(false);
+  const [showGithubModal, setShowGithubModal] = useState(false);
   const [templateName, setTemplateName] = useState("");
   const [templateCategory, setTemplateCategory] = useState("");
   const [templates, setTemplates] = useState([]);
@@ -26,14 +28,23 @@ function App() {
     environment: "saas_dev",
     userCode: "LBA",
     folderName: "DEMGEN_VB",
+    controlm_server: "IN01", // Add default Control-M server
   });
   const fileInputRef = useRef(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [existingTemplateId, setExistingTemplateId] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null);
+  const [selectedTechCategory, setSelectedTechCategory] = useState("");
+  const [githubConfig, setGithubConfig] = useState({
+    repository: "leanabarbion/workflow-repo",
+    branch: "main",
+    path: "workflows",
+    commitMessage: "Update workflow configuration",
+    userCode: deployConfig.userCode, // Initialize with deployConfig userCode
+  });
 
-  const categories = [
+  const templateCategories = [
     "Banking, Financial Services, Insurance",
     "Telecommunication",
     "Consumer Goods",
@@ -209,12 +220,13 @@ function App() {
         technologies: selectedTechnologies,
         use_case: useCase,
         renamed_technologies: renamedTechnologies,
-        optimal_order: workflow,
+        optimal_order: optimalOrder || selectedTechnologies,
         environment: deployConfig.environment,
         user_code: deployConfig.userCode,
         folder_name: deployConfig.folderName,
         application: deployConfig.application,
         sub_application: deployConfig.subApplication,
+        controlm_server: deployConfig.controlm_server,
       };
 
       console.log("Request body:", JSON.stringify(requestBody, null, 2));
@@ -671,7 +683,11 @@ function App() {
   }, [showDeployModal]);
 
   const filteredTechnologies = selectedTechnologies.filter((tech) =>
-    tech.toLowerCase().includes(searchTerm.toLowerCase())
+    selectedTechCategory === ""
+      ? true
+      : techCategories
+          .find((cat) => cat.name === selectedTechCategory)
+          ?.technologies.some((t) => t.name === tech)
   );
 
   const handleSaveAsTemplate = async () => {
@@ -957,6 +973,75 @@ function App() {
     ? templates.filter((template) => template.category === selectedCategory)
     : templates;
 
+  const handleGithubUpload = async () => {
+    if (!selectedTechnologies.length) {
+      setStatus("Please select technologies first.");
+      setTimeout(() => setStatus(""), 3000);
+      return;
+    }
+
+    try {
+      setStatus("Creating workflow...");
+
+      // First, create the workflow
+      const createResponse = await fetch(
+        "http://localhost:5000/create_workflow",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            technologies: selectedTechnologies,
+            use_case: useCase,
+            renamed_technologies: renamedTechnologies,
+            optimal_order: optimalOrder || selectedTechnologies,
+            environment: deployConfig.environment,
+            user_code: githubConfig.userCode,
+            folder_name: deployConfig.folderName,
+            application: deployConfig.application,
+            sub_application: deployConfig.subApplication,
+            controlm_server: deployConfig.controlm_server,
+          }),
+        }
+      );
+
+      if (!createResponse.ok) {
+        const errorData = await createResponse.json();
+        throw new Error(errorData.error || "Failed to create workflow");
+      }
+
+      // Now upload to GitHub
+      const githubResponse = await fetch(
+        "http://localhost:5000/upload-github",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            narrative_text: narrative,
+            user_info: githubConfig.userCode,
+          }),
+        }
+      );
+
+      if (!githubResponse.ok) {
+        const errorData = await githubResponse.json();
+        throw new Error(errorData.error || "Failed to upload to GitHub");
+      }
+
+      const githubData = await githubResponse.json();
+      setStatus("Successfully uploaded to GitHub!");
+      setShowGithubModal(false);
+      setTimeout(() => setStatus(""), 3000);
+    } catch (error) {
+      console.error("GitHub upload error:", error);
+      setStatus(`Error: ${error.message}`);
+      setTimeout(() => setStatus(""), 3000);
+    }
+  };
+
   return (
     <div className="app-container">
       <div className="content-container">
@@ -1030,13 +1115,19 @@ function App() {
           <div className="technology-selection">
             <h3>Select your technologies</h3>
             <div className="technology-selection-header">
-              <div className="technology-search">
-                <input
-                  type="text"
-                  placeholder="Search technologies..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
+              <div className="technology-category-filter">
+                <select
+                  value={selectedTechCategory}
+                  onChange={(e) => setSelectedTechCategory(e.target.value)}
+                  className="category-select"
+                >
+                  <option value="">All Categories</option>
+                  {techCategories.map((category) => (
+                    <option key={category.name} value={category.name}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
               </div>
               <button
                 className="action-button"
@@ -1062,6 +1153,7 @@ function App() {
             <TechnologyGrid
               selectedIcons={selectedTechnologies}
               onToggle={toggleTechnologyInWorkflow}
+              selectedCategory={selectedTechCategory}
             />
           </div>
         </div>
@@ -1111,7 +1203,7 @@ function App() {
 
             {optimalOrder && (
               <div className="optimal-workflow">
-                <h3>Optimal Order:</h3>
+                <h3>Logical Order:</h3>
                 <ol className="ordered-list">
                   {optimalOrder.map((tech, index) =>
                     renderWorkflowItem(tech, index)
@@ -1168,6 +1260,15 @@ function App() {
                   </button>
                   <button
                     className="action-button"
+                    onClick={() => setShowGithubModal(true)}
+                    disabled={
+                      !selectedTechnologies.length || !useCase || !narrative
+                    }
+                  >
+                    Upload to GitHub
+                  </button>
+                  <button
+                    className="action-button"
                     onClick={() => {
                       setShowTemplateModal(true);
                     }}
@@ -1217,6 +1318,16 @@ function App() {
                   setDeployConfig((prev) => ({
                     ...prev,
                     environment: e.target.value,
+                    // Update Control-M server based on environment
+                    controlm_server: e.target.value.startsWith("saas")
+                      ? "IN01"
+                      : e.target.value === "vse_dev"
+                      ? "DEV"
+                      : e.target.value === "vse_qa"
+                      ? "QA"
+                      : e.target.value === "vse_prod"
+                      ? "PROD"
+                      : "IN01",
                   }))
                 }
               >
@@ -1226,6 +1337,23 @@ function App() {
                 <option value="vse_dev">VSE Dev</option>
                 <option value="vse_qa">VSE QA</option>
                 <option value="vse_prod">VSE Prod</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Control-M Server:</label>
+              <select
+                value={deployConfig.controlm_server}
+                onChange={(e) =>
+                  setDeployConfig((prev) => ({
+                    ...prev,
+                    controlm_server: e.target.value,
+                  }))
+                }
+              >
+                <option value="IN01">IN01</option>
+                <option value="DEV">DEV</option>
+                <option value="QA">QA</option>
+                <option value="PROD">PROD</option>
               </select>
             </div>
             <div className="form-group">
@@ -1314,7 +1442,7 @@ function App() {
                   onChange={(e) => setTemplateCategory(e.target.value)}
                 >
                   <option value="">Select a category</option>
-                  {categories.map((category) => (
+                  {templateCategories.map((category) => (
                     <option key={category} value={category}>
                       {category}
                     </option>
@@ -1387,7 +1515,7 @@ function App() {
               >
                 All Categories
               </button>
-              {categories.map((category) => (
+              {templateCategories.map((category) => (
                 <button
                   key={category}
                   className={`category-button ${
@@ -1445,6 +1573,93 @@ function App() {
               >
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* GitHub Upload Modal */}
+      {showGithubModal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h2>Upload to GitHub</h2>
+            <div className="modal-form">
+              <div className="form-group">
+                <label>User Code:</label>
+                <input
+                  type="text"
+                  value={githubConfig.userCode}
+                  onChange={(e) =>
+                    setGithubConfig((prev) => ({
+                      ...prev,
+                      userCode: e.target.value,
+                    }))
+                  }
+                  placeholder="Enter your user code"
+                />
+              </div>
+              <div className="form-group">
+                <label>Repository:</label>
+                <input
+                  type="text"
+                  value={githubConfig.repository}
+                  onChange={(e) =>
+                    setGithubConfig((prev) => ({
+                      ...prev,
+                      repository: e.target.value,
+                    }))
+                  }
+                  placeholder="owner/repository"
+                />
+              </div>
+              <div className="form-group">
+                <label>Branch:</label>
+                <input
+                  type="text"
+                  value={githubConfig.branch}
+                  onChange={(e) =>
+                    setGithubConfig((prev) => ({
+                      ...prev,
+                      branch: e.target.value,
+                    }))
+                  }
+                  placeholder="main"
+                />
+              </div>
+              <div className="form-group">
+                <label>Path:</label>
+                <input
+                  type="text"
+                  value={githubConfig.path}
+                  onChange={(e) =>
+                    setGithubConfig((prev) => ({
+                      ...prev,
+                      path: e.target.value,
+                    }))
+                  }
+                  placeholder="path/to/workflow.json"
+                />
+              </div>
+              <div className="form-group">
+                <label>Commit Message:</label>
+                <input
+                  type="text"
+                  value={githubConfig.commitMessage}
+                  onChange={(e) =>
+                    setGithubConfig((prev) => ({
+                      ...prev,
+                      commitMessage: e.target.value,
+                    }))
+                  }
+                  placeholder="Update workflow configuration"
+                />
+              </div>
+              <div className="modal-actions">
+                <button onClick={() => setShowGithubModal(false)}>
+                  Cancel
+                </button>
+                <button onClick={handleGithubUpload}>Upload</button>
+              </div>
             </div>
           </div>
         </div>

@@ -960,10 +960,36 @@ input[type="file"] {
 
 .technology-selection-header {
   display: flex;
-  gap: 1rem;
-  margin-bottom: 1rem;
+  gap: 10px;
+  margin-bottom: 20px;
   align-items: center;
   flex-wrap: wrap;
+}
+
+.technology-category-filter {
+  flex: 1;
+  min-width: 200px;
+}
+
+.category-select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  background-color: white;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+
+.category-select:focus {
+  outline: none;
+  border-color: #4a90e2;
+  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.1);
+}
+
+.category-select option {
+  padding: 8px;
 }
 
 .technology-search {

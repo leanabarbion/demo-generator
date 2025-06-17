@@ -13,6 +13,8 @@ from openai import AzureOpenAI
 from job_library import JOB_LIBRARY
 import time
 from datetime import datetime
+import base64
+import requests
 
 load_dotenv()
 # Load Azure OpenAI credentials from .env
@@ -28,6 +30,62 @@ client = AzureOpenAI(
     azure_endpoint=azure_openai_endpoint
 )
 
+# GitHub Config (store token securely in .env)
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+if not GITHUB_TOKEN:
+    raise ValueError("GitHub token not found in environment variables. Please set GITHUB_TOKEN in your .env file.")
+REPO_OWNER = "leanabarbion"
+REPO_NAME = "workflow-repo"  # Replace with your repo name
+BRANCH = "main"
+BASE_FOLDER_PATH = "jobs"  # Folder where files will be uploaded
+
+
+def connect_to_github(file_path, content, message):
+    """Uploads a file to GitHub repository using GitHub API."""
+    if not GITHUB_TOKEN:
+        app.logger.error("❌ GitHub token is not set")
+        return {"status": "error", "message": "GitHub token is not configured"}
+
+    url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{file_path}"
+    
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Content-Type": "application/json",
+    }
+
+    try:
+        # Get the SHA if the file exists (needed for updates)
+        response = requests.get(url, headers=headers)
+        if response.status_code == 404:
+            # File doesn't exist yet, that's okay
+            sha = None
+        elif response.status_code != 200:
+            error_msg = response.json().get("message", "Unknown error")
+            app.logger.error(f"❌ Error checking file existence: {error_msg}")
+            return {"status": "error", "message": f"Error checking file existence: {error_msg}"}
+        else:
+            sha = response.json().get("sha")
+
+        data = {
+            "message": message,
+            "content": base64.b64encode(content.encode()).decode(),
+            "branch": BRANCH,
+        }
+        if sha:
+            data["sha"] = sha  # Required for updates
+
+        upload_response = requests.put(url, headers=headers, data=json.dumps(data))
+        
+        if upload_response.status_code in [200, 201]:
+            app.logger.info(f"✅ Successfully uploaded file: {file_path}")
+            return {"status": "success", "file": file_path}
+        else:
+            error_msg = upload_response.json().get("message", "Unknown error")
+            app.logger.error(f"❌ Error uploading file: {error_msg}")
+            return {"status": "error", "message": f"Error uploading file: {error_msg}"}
+    except Exception as e:
+        app.logger.error(f"❌ Exception during GitHub upload: {str(e)}")
+        return {"status": "error", "message": f"Exception during upload: {str(e)}"}
 
 
 app = Flask(__name__)
@@ -41,6 +99,7 @@ def generate_workflow():
         return jsonify({"error": "Missing 'jobs' in request."}), 400
 
     jobs_data = data['jobs']
+    subfolders_data = data.get('subfolders', [])
     environment = data.get('environment', 'saas_dev')
     folder_name = data.get('folder_name', 'LBA_DEMGEN_VB')
     user_code = data.get('user_code', 'LBA')
@@ -63,7 +122,7 @@ def generate_workflow():
         return jsonify({"error": "Invalid environment configuration"}), 400
 
     # Format folder and application names with user code
-    formatted_folder_name = f"{user_code}_{folder_name}"
+    formatted_folder_name = f"{user_code}-{folder_name}"
     formatted_application = f"{user_code}-DMO-GEN"
     formatted_sub_application = f"{user_code}-TEST-APP"
 
@@ -81,8 +140,37 @@ def generate_workflow():
     )
 
     workflow = Workflow(my_env, defaults=defaults)
+    
+    # Create main folder
     folder = Folder(formatted_folder_name, site_standard="Empty", controlm_server=controlm_server)
     workflow.add(folder)
+
+    # Create subfolders
+    subfolder_map = {}
+    for subfolder_data in subfolders_data:
+        subfolder_name = f"{user_code}-{subfolder_data['name']}"
+        subfolder = SubFolder(subfolder_name)
+        
+        # Add events
+        if subfolder_data['events']['add']:
+            add_events = [Event(event=event, date=Event.Date.OrderDate) 
+                         for event in subfolder_data['events']['add']]
+            subfolder.events_to_add.append(AddEvents(add_events))
+        
+        # Add wait events
+        if subfolder_data['events']['wait']:
+            wait_events = [Event(event=event, date=Event.Date.OrderDate) 
+                          for event in subfolder_data['events']['wait']]
+            subfolder.wait_for_events.append(WaitForEvents(wait_events))
+        
+        # Add delete events
+        if subfolder_data['events']['delete']:
+            delete_events = [Event(event=event, date=Event.Date.OrderDate) 
+                            for event in subfolder_data['events']['delete']]
+            subfolder.delete_events_list.append(DeleteEvents(delete_events))
+        
+        folder.sub_folder_list.append(subfolder)
+        subfolder_map[subfolder_data['name']] = subfolder
 
     # Group jobs by y-coordinate to identify concurrent jobs
     y_coordinates = {}
@@ -104,6 +192,7 @@ def generate_workflow():
     # Process jobs and create dependencies
     job_instances = {}
     dependencies = []
+    job_paths = {}  # Store full paths for each job
 
     for job_data in jobs_data:
         job_id = job_data['id']
@@ -114,8 +203,18 @@ def generate_workflow():
 
         # Create job instance
         job = JOB_LIBRARY[job_type]()
-        job.object_name = f"zzt-{job_data['name']}"
-        workflow.add(job, inpath=formatted_folder_name)
+        job.object_name = f"{user_code}-{job_data['name']}"
+        
+        # Add job to appropriate subfolder or main folder
+        if 'subfolder' in job_data and job_data['subfolder'] in subfolder_map:
+            subfolder_name = f"{user_code}-{job_data['subfolder']}"
+            subfolder_path = f"{formatted_folder_name}/{subfolder_name}"
+            workflow.add(job, inpath=subfolder_path)
+            job_paths[job_id] = f"{subfolder_path}/{job.object_name}"
+        else:
+            workflow.add(job, inpath=formatted_folder_name)
+            job_paths[job_id] = f"{formatted_folder_name}/{job.object_name}"
+            
         job_instances[job_id] = job
 
         # Handle dependencies
@@ -135,14 +234,22 @@ def generate_workflow():
             if job_id in job_instances:
                 job_instances[job_id].events_to_add.append(AddEvents([Event(event=completion_event)]))
 
-    # Connect jobs based on dependencies
+    # Connect jobs based on dependencies using full paths
     for dep in dependencies:
         for dep_id in dep['depends_on']:
             if dep_id in job_instances and dep['job'] in job_instances:
-                workflow.connect(
-                    f"{formatted_folder_name}/{job_instances[dep_id].object_name}",
-                    f"{formatted_folder_name}/{job_instances[dep['job']].object_name}"
-                )
+                try:
+                    workflow.connect(
+                        job_paths[dep_id],  # Source job path
+                        job_paths[dep['job']]  # Target job path
+                    )
+                except Exception as e:
+                    app.logger.error(f"Failed to connect jobs: {job_paths[dep_id]} -> {job_paths[dep['job']]}")
+                    app.logger.error(f"Error: {str(e)}")
+                    return jsonify({
+                        "error": f"Failed to connect jobs: {job_paths[dep_id]} -> {job_paths[dep['job']]}",
+                        "details": str(e)
+                    }), 500
 
     raw_json = workflow.dumps_json()
 
@@ -192,9 +299,18 @@ def generate_workflow():
                     "id": job_id,
                     "name": job_data['name'],
                     "type": job_data['type'],
-                    "object_name": job_instances[job_id].object_name
+                    "object_name": job_instances[job_id].object_name,
+                    "subfolder": job_data.get('subfolder', None)
                 }
                 for job_id, job_data in zip(job_instances.keys(), jobs_data)
+            ],
+            "subfolders": [
+                {
+                    "name": subfolder_data['name'],
+                    "description": subfolder_data.get('description', ''),
+                    "events": subfolder_data['events']
+                }
+                for subfolder_data in subfolders_data
             ],
             "concurrent_groups": concurrent_groups,
             "dependencies": dependencies
@@ -502,10 +618,13 @@ def rename_technologies():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/deploy_personalized_workflow", methods=["POST"])
-def deploy_personalized_workflow():
+@app.route("/create_workflow", methods=["POST"])
+def create_workflow():
     try:
         data = request.json
+        if not data:
+            return jsonify({"error": "No data provided in request"}), 400
+
         technologies = data.get("technologies")
         use_case = data.get("use_case")
         renamed_technologies = data.get("renamed_technologies")
@@ -515,6 +634,7 @@ def deploy_personalized_workflow():
         folder_name = data.get('folder_name', 'DEMGEN_VB')
         application = data.get('application', 'DMO-GEN')
         sub_application = data.get('sub_application', 'TEST-APP')
+        controlm_server = data.get('controlm_server', 'IN01')
 
         if not technologies or not use_case or not renamed_technologies:
             return jsonify({"error": "Technologies, use case, and renamed technologies are required."}), 400
@@ -524,67 +644,62 @@ def deploy_personalized_workflow():
         if environment not in valid_environments:
             return jsonify({"error": f"Invalid environment. Must be one of: {valid_environments}"}), 400
 
-        # Set Control-M server based on environment
-        if environment.startswith('saas'):
-            controlm_server = "IN01"
-        elif environment == 'vse_dev':
-            controlm_server = "DEV"
-        elif environment == 'vse_qa':
-            controlm_server = "QA"
-        elif environment == 'vse_prod':
-            controlm_server = "PROD"
-        else:
-            return jsonify({"error": "Invalid environment configuration"}), 400
-
         # First, get the AI to convert the names to Control-M format
-        completion = client.chat.completions.create(
-            model=azure_openai_deployment,
-            messages=[
-                {
-                    "role": "system",
-                    "content": """You are an AI assistant that converts job names to Control-M format.
-                    Your response must be in JSON format with this structure:
-                    {
-                        "controlm_jobs": {
-                            "original_name": "zzt-{converted_name}",
-                            ...
-                        }
-                    }
-                    Rules for conversion:
-                    1. Convert spaces to hyphens
-                    2. Remove special characters
-                    3. Keep names concise and clear
-                    4. Prefix with 'zzt-'
-                    5. Only return the JSON object, no additional text"""
-                },
-                {
-                    "role": "user",
-                    "content": f"""Convert these job names to Control-M format:
-                    Original Technologies: {technologies}
-                    Renamed Technologies: {renamed_technologies}
-                    Use Case: {use_case}
-                    
-                    Return ONLY a JSON object with the original names as keys and Control-M formatted names as values."""
-                }
-            ]
-        )
-
-        response_content = completion.choices[0].message.content.strip()
-        
-        # Parse the Control-M job names
         try:
-            start = response_content.find('{')
-            end = response_content.rfind('}') + 1
-            json_str = response_content[start:end]
-            controlm_jobs = json.loads(json_str)["controlm_jobs"]
+            completion = client.chat.completions.create(
+                model=azure_openai_deployment,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": f"""You are an AI assistant that converts job names to Control-M format.
+                        Your response must be in JSON format with this structure:
+                        {{
+                            "controlm_jobs": {{
+                                "original_name": "{user_code}-{{converted_name}}",
+                                ...
+                            }}
+                        }}
+                        Rules for conversion:
+                        1. Convert spaces to hyphens
+                        2. Remove special characters
+                        3. Keep names concise and clear
+                        4. Prefix with '{user_code}-' and no other prefix
+                        5. Only return the JSON object, no additional text"""
+                    },
+                    {
+                        "role": "user",
+                        "content": f"""Convert these job names to Control-M format:
+                        Original Technologies: {technologies}
+                        Renamed Technologies: {renamed_technologies}
+                        Use Case: {use_case}
+                        
+                        Return ONLY a JSON object with the original names as keys and Control-M formatted names as values."""
+                    }
+                ]
+            )
+
+            response_content = completion.choices[0].message.content.strip()
+            
+            # Parse the Control-M job names
+            try:
+                start = response_content.find('{')
+                end = response_content.rfind('}') + 1
+                json_str = response_content[start:end]
+                controlm_jobs = json.loads(json_str)["controlm_jobs"]
+            except Exception as e:
+                return jsonify({"error": f"Failed to parse Control-M job names: {str(e)}"}), 500
+
         except Exception as e:
-            return jsonify({"error": "Failed to parse Control-M job names"}), 500
+            return jsonify({"error": f"Failed to generate Control-M job names: {str(e)}"}), 500
 
         # Create the workflow with the new job names
-        my_env = Environment.create_saas(
-            endpoint=my_secrets[f'{environment}_endpoint'],
-            api_key=my_secrets[f'{environment}_api_key']
-        )
+        try:
+            my_env = Environment.create_saas(
+                endpoint=my_secrets[f'{environment}_endpoint'],
+                api_key=my_secrets[f'{environment}_api_key']
+            )
+        except Exception as e:
+            return jsonify({"error": f"Failed to create environment: {str(e)}"}), 500
 
         # Format folder and application names with user code
         formatted_folder_name = f"{user_code}_{folder_name}"
@@ -627,38 +742,60 @@ def deploy_personalized_workflow():
 
         raw_json = workflow.dumps_json()
         
-        # Check for build and deploy errors
-        build_errors = workflow.build().errors
-        deploy_errors = workflow.deploy().errors
-
-        if build_errors is None and deploy_errors is None:
-            # Save JSON to output.json
+        # Save JSON to output.json
+        try:
             with open("output.json", "w") as f:
                 f.write(raw_json)
-            
-            # Run the Control-M CLI commands
-            try:
-                subprocess.run(["ctm", "build", "output.json"], check=True)
-                subprocess.run(["ctm", "deploy", "output.json"], check=True)
-                return jsonify({
-                    "message": "Personalized workflow deployed successfully",
-                    "workflow": raw_json,
-                    "ordered_jobs": ordered_jobs,
-                    "environment": environment,
-                    "controlm_server": controlm_server,
-                    "folder_name": formatted_folder_name
-                }), 200
-            except subprocess.CalledProcessError as e:
-                return jsonify({"error": f"Control-M command failed: {str(e)}"}), 500
-        else:
+        except Exception as e:
+            return jsonify({"error": f"Failed to save workflow JSON: {str(e)}"}), 500
+
+        return jsonify({
+            "message": "Workflow created successfully",
+            "workflow": raw_json,
+            "ordered_jobs": ordered_jobs,
+            "environment": environment,
+            "controlm_server": controlm_server,
+            "folder_name": formatted_folder_name
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
+
+@app.route("/deploy_personalized_workflow", methods=["POST"])
+def deploy_personalized_workflow():
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "No data provided in request"}), 400
+
+        workflow_json = data.get("workflow")
+        if not workflow_json:
+            return jsonify({"error": "No workflow JSON provided"}), 400
+
+        # Save the workflow JSON to output.json
+        try:
+            with open("output.json", "w") as f:
+                f.write(workflow_json)
+        except Exception as e:
+            return jsonify({"error": f"Failed to save workflow JSON: {str(e)}"}), 500
+
+        # Run the Control-M CLI commands
+        try:
+            build_result = subprocess.run(["ctm", "build", "output.json"], capture_output=True, text=True, check=True)
+            deploy_result = subprocess.run(["ctm", "deploy", "output.json"], capture_output=True, text=True, check=True)
             return jsonify({
-                "error": "Workflow build or deploy failed",
-                "build_errors": build_errors,
-                "deploy_errors": deploy_errors
+                "message": "Personalized workflow deployed successfully",
+                "build_output": build_result.stdout,
+                "deploy_output": deploy_result.stdout
+            }), 200
+        except subprocess.CalledProcessError as e:
+            return jsonify({
+                "error": "Control-M command failed",
+                "details": e.stderr if e.stderr else str(e)
             }), 500
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
 
 
 @app.route('/download_workflow', methods=['POST'])
@@ -1019,6 +1156,61 @@ def update_template():
 
     except Exception as e:
         app.logger.error(f"❌ Error updating template: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/upload-github", methods=["POST"])
+def upload_github():
+    """Endpoint to upload workflow and narrative files to GitHub."""
+    try:
+        if not GITHUB_TOKEN:
+            return jsonify({"error": "GitHub token is not configured"}), 500
+
+        data = request.json
+        narrative_text = data.get("narrative_text", "")
+        user_code = data.get("user_info", "unknown_user")
+
+        if not narrative_text:
+            return jsonify({"error": "Missing narrative"}), 400
+
+        # Read the output.json file
+        try:
+            with open("output.json", "r") as f:
+                workflow_json = f.read()
+        except Exception as e:
+            return jsonify({"error": f"Failed to read output.json: {str(e)}"}), 500
+
+        # Generate a unique folder name (Timestamp format: YYYY-MM-DD_HH-MM-SS)
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        folder_name = f"{BASE_FOLDER_PATH}/{user_code}_workflow_{timestamp}"
+
+        # Define file paths inside this user-specific folder
+        workflow_file = f"{folder_name}/{user_code}_workflow.json"
+        narrative_file = f"{folder_name}/{user_code}_narrative.txt"
+        metadata_file = f"{folder_name}/{user_code}_metadata.txt"
+
+        # Upload both files
+        upload_workflow = connect_to_github(workflow_file, workflow_json, "Added workflow JSON")
+        if upload_workflow["status"] == "error":
+            return jsonify({"error": upload_workflow["message"]}), 500
+
+        upload_narrative = connect_to_github(narrative_file, narrative_text, "Added workflow narrative")
+        if upload_narrative["status"] == "error":
+            return jsonify({"error": upload_narrative["message"]}), 500
+
+        # Optional: Upload metadata (user info, timestamp, etc.)
+        metadata_content = f"Upload Time: {timestamp}\nUser Code: {user_code}"
+        upload_metadata = connect_to_github(metadata_file, metadata_content, "Added metadata")
+        if upload_metadata["status"] == "error":
+            return jsonify({"error": upload_metadata["message"]}), 500
+
+        return jsonify({
+            "workflow": upload_workflow,
+            "narrative": upload_narrative,
+            "metadata": upload_metadata
+        }), 200
+    except Exception as e:
+        app.logger.error(f"❌ Error in upload_github: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 

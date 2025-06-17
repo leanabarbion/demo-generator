@@ -1,11 +1,15 @@
 import React from "react";
 import "./TechnologyGrid.css"; // Create a CSS file for specific styles
-import categories from "./categories";
+import techCategories from "./categories";
 
-const TechnologyGrid = ({ selectedIcons, onToggle }) => {
+const TechnologyGrid = ({ selectedIcons, onToggle, selectedCategory }) => {
+  const filteredCategories = selectedCategory
+    ? techCategories.filter((category) => category.name === selectedCategory)
+    : techCategories;
+
   return (
     <div className="category-container">
-      {categories.map((category) => (
+      {filteredCategories.map((category) => (
         <div key={category.name} className="category-card">
           <h3 className="category-title">{category.name}</h3>
           <div className="technology-grid">
