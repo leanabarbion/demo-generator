@@ -254,79 +254,6 @@ function App() {
     }
   };
 
-  const handlePersonalizedDeployConfirm = async () => {
-    try {
-      // Close modal immediately when deploy is clicked
-      setShowDeployModal(false);
-
-      console.log("Starting deployment with config:", deployConfig);
-      setStatus("Deploying personalized workflow...");
-
-      const requestBody = {
-        technologies: selectedTechnologies,
-        use_case: useCase,
-        renamed_technologies: renamedTechnologies,
-        optimal_order: optimalOrder || selectedTechnologies,
-        environment: deployConfig.environment,
-        user_code: deployConfig.userCode,
-        folder_name: deployConfig.folderName,
-        application: deployConfig.application,
-        sub_application: deployConfig.subApplication,
-        controlm_server: deployConfig.controlm_server,
-      };
-
-      console.log("Request body:", JSON.stringify(requestBody, null, 2));
-
-      const response = await fetch(
-        "http://localhost:5000/deploy_personalized_workflow",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(requestBody),
-        }
-      );
-
-      console.log("Response status:", response.status);
-      console.log(
-        "Response headers:",
-        Object.fromEntries(response.headers.entries())
-      );
-
-      const responseText = await response.text();
-      console.log("Raw response:", responseText);
-
-      if (!response.ok) {
-        let errorMessage;
-        try {
-          const errorData = JSON.parse(responseText);
-          errorMessage = errorData.error || "Failed to deploy workflow";
-        } catch (e) {
-          errorMessage = `Server error: ${responseText}`;
-        }
-        console.error("Deployment failed:", errorMessage);
-        throw new Error(errorMessage);
-      }
-
-      let data;
-      try {
-        data = JSON.parse(responseText);
-        console.log("Parsed response data:", data);
-      } catch (e) {
-        console.error("Failed to parse response as JSON:", e);
-        throw new Error("Invalid response from server");
-      }
-
-      setStatus("Workflow deployed successfully!");
-      setTimeout(() => setStatus(""), 3000);
-    } catch (error) {
-      console.error("Deployment error:", error);
-      setStatus(`Error: ${error.message}`);
-      setTimeout(() => setStatus(""), 3000);
-    }
-  };
-
   const handleDeployPersonalizedWorkflow = () => {
     console.log("Deploy button clicked");
     console.log("Current state:", {
@@ -351,6 +278,54 @@ function App() {
     }
     console.log("Opening deployment modal");
     setShowDeployModal(true);
+  };
+
+  const handlePersonalizedDeployConfirm = async () => {
+    try {
+      // Close modal immediately when deploy is clicked
+      setShowDeployModal(false);
+
+      console.log("Starting deployment with config:", deployConfig);
+      setStatus("Deploying workflow...");
+
+      // Deploy the workflow directly
+      const deployResponse = await fetch(
+        "http://localhost:5000/deploy_personalized_workflow",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            technologies: selectedTechnologies,
+            use_case: useCase,
+            renamed_technologies: renamedTechnologies,
+            optimal_order: optimalOrder || selectedTechnologies,
+            environment: deployConfig.environment,
+            user_code: deployConfig.userCode,
+            folder_name: deployConfig.folderName,
+            application: deployConfig.application,
+            sub_application: deployConfig.subApplication,
+            controlm_server: deployConfig.controlm_server,
+          }),
+        }
+      );
+
+      if (!deployResponse.ok) {
+        const errorData = await deployResponse.json();
+        throw new Error(errorData.error || "Failed to deploy workflow");
+      }
+
+      const deployData = await deployResponse.json();
+      console.log("Workflow deployed successfully:", deployData);
+
+      setStatus("Workflow deployed successfully!");
+      setTimeout(() => setStatus(""), 3000);
+    } catch (error) {
+      console.error("Deployment error:", error);
+      setStatus(`Error: ${error.message}`);
+      setTimeout(() => setStatus(""), 3000);
+    }
   };
 
   const handleDownloadWorkflow = async () => {
@@ -1344,7 +1319,7 @@ function App() {
 
             {optimalOrder && (
               <div className="optimal-workflow">
-                <h3>Logical Order:</h3>
+                <h3>Logical Order based on Use Case:</h3>
                 <ol className="ordered-list">
                   {optimalOrder.map((tech, index) =>
                     renderWorkflowItem(tech, index)
@@ -1365,7 +1340,7 @@ function App() {
                     onClick={generateOptimalOrder}
                     disabled={!selectedTechnologies.length || !useCase}
                   >
-                    Generate Optimal Order
+                    Generate Logical Order
                   </button>
                   <button
                     className="action-button"

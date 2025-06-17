@@ -853,37 +853,134 @@ def create_workflow():
 @app.route("/deploy_personalized_workflow", methods=["POST"])
 def deploy_personalized_workflow():
     try:
+        app.logger.info("🚀 Starting personalized workflow deployment")
         data = request.json
         if not data:
+            app.logger.error("❌ No data provided in request")
             return jsonify({"error": "No data provided in request"}), 400
 
-        workflow_json = data.get("workflow")
-        if not workflow_json:
-            return jsonify({"error": "No workflow JSON provided"}), 400
+        # Extract workflow configuration from request
+        environment = data.get('environment', 'saas_dev')
+        user_code = data.get('user_code', 'LBA')
+        folder_name = data.get('folder_name', 'DEMGEN_VB')
+        application = data.get('application', 'DMO-GEN')
+        sub_application = data.get('sub_application', 'TEST-APP')
+        technologies = data.get('technologies', [])
+        renamed_technologies = data.get('renamed_technologies', {})
+        ordered_workflow = data.get('optimal_order') or technologies
 
-        # Save the workflow JSON to output.json
-        try:
-            with open("output.json", "w") as f:
-                f.write(workflow_json)
-        except Exception as e:
-            return jsonify({"error": f"Failed to save workflow JSON: {str(e)}"}), 500
+        if not technologies or not renamed_technologies:
+            app.logger.error("❌ Missing required technologies or renamed technologies")
+            return jsonify({"error": "Technologies and renamed technologies are required"}), 400
 
-        # Run the Control-M CLI commands
+        # Validate environment
+        valid_environments = ['saas_dev', 'saas_preprod', 'saas_prod', 'vse_dev', 'vse_qa', 'vse_prod']
+        if environment not in valid_environments:
+            return jsonify({"error": f"Invalid environment. Must be one of: {valid_environments}"}), 400
+
+        # Set Control-M server based on environment
+        if environment.startswith('saas'):
+            controlm_server = "IN01"
+        elif environment == 'vse_dev':
+            controlm_server = "DEV"
+        elif environment == 'vse_qa':
+            controlm_server = "QA"
+        elif environment == 'vse_prod':
+            controlm_server = "PROD"
+        else:
+            return jsonify({"error": "Invalid environment configuration"}), 400
+
         try:
-            build_result = subprocess.run(["ctm", "build", "output.json"], capture_output=True, text=True, check=True)
-            deploy_result = subprocess.run(["ctm", "deploy", "output.json"], capture_output=True, text=True, check=True)
+            # Create environment connection
+            app.logger.info(f"🔧 Creating environment connection for {environment}")
+            my_env = Environment.create_saas(
+                endpoint=my_secrets[f'{environment}_endpoint'],
+                api_key=my_secrets[f'{environment}_api_key']
+            )
+
+            # Format names
+            formatted_folder_name = f"{user_code}_{folder_name}"
+            formatted_application = f"{user_code}-{application}"
+            formatted_sub_application = f"{user_code}-{sub_application}"
+
+            # Create workflow defaults
+            defaults = WorkflowDefaults(
+                run_as="ctmagent",
+                host="zzz-linux-agents",
+                application=formatted_application,
+                sub_application=formatted_sub_application
+            )
+
+            # Create workflow
+            app.logger.info("🔨 Creating workflow object")
+            workflow = Workflow(my_env, defaults=defaults)
+
+            # Create folder
+            folder = Folder(formatted_folder_name, site_standard="Empty", controlm_server=controlm_server)
+            workflow.add(folder)
+
+            # Add jobs to workflow
+            job_paths = []
+            ordered_jobs = []
+
+            # Use the ordered workflow to maintain the sequence
+            for job_key in ordered_workflow:
+                if job_key not in JOB_LIBRARY:
+                    app.logger.error(f"❌ Unknown job type: {job_key}")
+                    return jsonify({"error": f"Unknown job type: {job_key}"}), 400
+
+                # Get the job from the library
+                job = JOB_LIBRARY[job_key]()
+                
+                # Update the object name with the Control-M format
+                new_name = renamed_technologies.get(job_key, f"{user_code}-{job_key}")
+                job.object_name = new_name
+                
+                workflow.add(job, inpath=formatted_folder_name)
+                job_paths.append(f"{formatted_folder_name}/{new_name}")
+                ordered_jobs.append(new_name)
+
+            # Chain the jobs in the specified order
+            for i in range(len(job_paths) - 1):
+                workflow.connect(job_paths[i], job_paths[i + 1])
+
+            # Build the workflow
+            app.logger.info("🔨 Building workflow")
+            build_result = workflow.build()
+            if build_result.errors:
+                app.logger.error(f"❌ Build errors: {build_result.errors}")
+                return jsonify({
+                    "error": "Workflow build failed",
+                    "details": build_result.errors
+                }), 500
+            
+            # Deploy the workflow
+            app.logger.info("🚀 Deploying workflow")
+            deploy_result = workflow.deploy()
+            if deploy_result.errors:
+                app.logger.error(f"❌ Deploy errors: {deploy_result.errors}")
+                return jsonify({
+                    "error": "Workflow deployment failed",
+                    "details": deploy_result.errors
+                }), 500
+            
+            app.logger.info("🎉 Workflow deployment completed successfully")
             return jsonify({
                 "message": "Personalized workflow deployed successfully",
-                "build_output": build_result.stdout,
-                "deploy_output": deploy_result.stdout
+                "build_result": str(build_result),
+                "deploy_result": str(deploy_result),
+                "ordered_jobs": ordered_jobs
             }), 200
-        except subprocess.CalledProcessError as e:
+
+        except Exception as e:
+            app.logger.error(f"❌ Error during workflow creation/build/deploy: {str(e)}")
             return jsonify({
-                "error": "Control-M command failed",
-                "details": e.stderr if e.stderr else str(e)
+                "error": "Workflow creation/build/deploy failed",
+                "details": str(e)
             }), 500
 
     except Exception as e:
+        app.logger.error(f"❌ Unexpected error in deployment: {str(e)}")
         return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
 
 
