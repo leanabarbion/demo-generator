@@ -1418,3 +1418,44 @@ input[type="file"] {
   opacity: 0.9;
   transform: translateY(-1px);
 }
+
+.talk-track-display {
+  margin-top: 20px;
+  padding: 20px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.talk-track-display h1 {
+  color: #2c3e50;
+  font-size: 24px;
+  margin-bottom: 20px;
+  border-bottom: 2px solid #3498db;
+  padding-bottom: 10px;
+}
+
+.talk-track-display h2 {
+  color: #34495e;
+  font-size: 20px;
+  margin: 15px 0;
+  padding-left: 10px;
+  border-left: 4px solid #3498db;
+}
+
+.talk-track-display p {
+  color: #2c3e50;
+  line-height: 1.6;
+  margin: 10px 0;
+}
+
+.talk-track-display ul {
+  margin: 10px 0;
+  padding-left: 20px;
+}
+
+.talk-track-display li {
+  color: #2c3e50;
+  margin: 5px 0;
+  line-height: 1.4;
+}

@@ -492,6 +492,92 @@ def generate_narrative():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/generate-talktrack", methods=["POST"])
+def generate_talktrack():
+    try: 
+        data = request.json
+        technologies = data.get("technologies")
+        use_case = data.get("use_case")
+        ordered_workflow = data.get("optimal_order") or technologies
+
+        if not technologies or not use_case or not ordered_workflow:
+            return jsonify({"error": "Technologies, use case, and workflow order are required."}), 400
+        
+        app.logger.info(f"🎤 Generating Talk Track with:")
+        app.logger.info(f"Technologies: {technologies}")
+        app.logger.info(f"Use Case: {use_case}")
+        app.logger.info(f"Ordered Workflow: {ordered_workflow}")
+
+        def generate_stream():
+            try:
+                completion = client.chat.completions.create(
+                    model=azure_openai_deployment,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": """You are an AI assistant that generates presentation-style talk tracks for BMC Control-M workflow demonstrations.
+                            Your response must follow this exact structure and formatting:
+                            
+                            # Workflow Demonstration Talk Track
+                            [A compelling title that captures the essence of the workflow]
+
+                            ## Introduction (30 seconds)
+                            [A brief, engaging introduction that hooks the audience and sets up the business context]
+
+                            ## Business Challenge (1 minute)
+                            [Describe the business problem or opportunity that this workflow addresses]
+
+                            ## Solution Overview (1 minute)
+                            [High-level explanation of how the workflow solves the business challenge]
+
+                            ## Workflow Walkthrough (3-4 minutes)
+                            [Step-by-step explanation of the workflow, including:
+                            - What each job does
+                            - Why it's important
+                            - How it connects to the next step
+                            - Business value at each stage]
+
+                            ## Key Benefits (1 minute)
+                            [Highlight the main advantages and improvements this workflow brings]
+
+                            ## Technical Highlights (1 minute)
+                            [Point out the most impressive technical aspects of the implementation]
+
+                            ## Conclusion (30 seconds)
+                            [Wrap up with a strong call to action or next steps]
+
+                            Format your response with clear section headers and engaging, presentation-style language.
+                            Use markdown formatting for better readability."""
+                        },
+                        {
+                            "role": "user",
+                            "content": f"""Generate a presentation talk track for the following workflow:
+                            Technologies: {technologies}
+                            Workflow Order: {ordered_workflow}
+                            Use Case: {use_case}
+                            
+                            Follow the exact structure provided, with clear section headers and timing guidance."""
+                        }
+                    ],
+                    stream=True
+                )
+
+                for chunk in completion:
+                    if chunk.choices and hasattr(chunk.choices[0], "delta"):
+                        content = getattr(chunk.choices[0].delta, "content", None)
+                        if content:
+                            yield content
+            except Exception as e:
+                app.logger.error(f"❌ Error during streaming: {str(e)}")
+                yield json.dumps({"error": str(e)})
+
+        return Response(generate_stream(), content_type="text/plain")
+
+    except Exception as e:
+        app.logger.error(f"❌ Error generating talk track: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/proposed_workflow", methods=["POST"])
 def proposed_workflow():
     try:

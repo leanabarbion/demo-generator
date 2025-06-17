@@ -11,6 +11,7 @@ function App() {
   const [status, setStatus] = useState(null);
   const [optimalOrder, setOptimalOrder] = useState(null);
   const [narrative, setNarrative] = useState("");
+  const [talkTrack, setTalkTrack] = useState("");
   const [proposedWorkflow, setProposedWorkflow] = useState(null);
   const [renamedTechnologies, setRenamedTechnologies] = useState({});
   const [selectedTechnologies, setSelectedTechnologies] = useState([]);
@@ -140,6 +141,49 @@ function App() {
     } catch (error) {
       console.error("Narrative Generation Error:", error);
       setStatus("Failed to generate narrative.");
+    }
+    setTimeout(() => setStatus(null), 3000);
+  };
+
+  const generateTalkTrack = async () => {
+    if (selectedTechnologies.length === 0 || !useCase.trim()) {
+      setStatus("Provide technologies and use case first.");
+      setTimeout(() => setStatus(null), 3000);
+      return;
+    }
+
+    setStatus("Generating talk track...");
+    setTalkTrack("");
+
+    try {
+      const response = await fetch("http://localhost:5000/generate-talktrack", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          technologies: selectedTechnologies,
+          use_case: useCase,
+          optimal_order: optimalOrder || selectedTechnologies,
+        }),
+      });
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let fullTalkTrack = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunkText = decoder.decode(value, { stream: true });
+        fullTalkTrack += chunkText;
+        setTalkTrack(fullTalkTrack);
+      }
+
+      setStatus("Talk track generated!");
+    } catch (error) {
+      console.error("Talk Track Generation Error:", error);
+      setStatus("Failed to generate talk track.");
     }
     setTimeout(() => setStatus(null), 3000);
   };
@@ -1290,6 +1334,13 @@ function App() {
                   >
                     Generate Documentation
                   </button>
+                  <button
+                    className="action-button"
+                    onClick={generateTalkTrack}
+                    disabled={!selectedTechnologies.length || !useCase}
+                  >
+                    Generate Talk Track
+                  </button>
                 </div>
               </div>
             </div>
@@ -1300,6 +1351,12 @@ function App() {
           {narrative && (
             <div className="narrative-display">
               <div dangerouslySetInnerHTML={{ __html: marked(narrative) }} />
+            </div>
+          )}
+
+          {talkTrack && (
+            <div className="talk-track-display">
+              <div dangerouslySetInnerHTML={{ __html: marked(talkTrack) }} />
             </div>
           )}
         </div>
