@@ -15,6 +15,9 @@ import time
 from datetime import datetime
 import base64
 import requests
+import docx
+import PyPDF2
+import pdfplumber
 
 load_dotenv()
 # Load Azure OpenAI credentials from .env
@@ -1297,6 +1300,140 @@ def upload_github():
         }), 200
     except Exception as e:
         app.logger.error(f"❌ Error in upload_github: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/analyze_documentation", methods=["POST"])
+def analyze_documentation():
+    try:
+        if 'file' not in request.files:
+            return jsonify({"error": "No file provided"}), 400
+        
+        file = request.files['file']
+        use_case = request.form.get('use_case', '')
+        
+        if not file:
+            return jsonify({"error": "No file selected"}), 400
+            
+        if not file.filename.endswith(('.txt', '.doc', '.docx', '.pdf')):
+            return jsonify({"error": "Invalid file format. Please upload .txt, .doc, .docx, or .pdf files"}), 400
+
+        # Read file content based on file type
+        file_content = ""
+        try:
+            if file.filename.endswith('.txt'):
+                file_content = file.read().decode('utf-8')
+            elif file.filename.endswith(('.doc', '.docx')):
+                # Save the file temporarily
+                temp_path = f"temp_{int(time.time())}.docx"
+                file.save(temp_path)
+                
+                # Read the Word document
+                doc = docx.Document(temp_path)
+                file_content = "\n".join([paragraph.text for paragraph in doc.paragraphs])
+                
+                # Clean up temporary file
+                os.remove(temp_path)
+                
+            elif file.filename.endswith('.pdf'):
+                # Save the file temporarily
+                temp_path = f"temp_{int(time.time())}.pdf"
+                file.save(temp_path)
+                
+                # Try using pdfplumber first (better for text extraction)
+                try:
+                    with pdfplumber.open(temp_path) as pdf:
+                        file_content = "\n".join([page.extract_text() for page in pdf.pages])
+                except Exception as e:
+                    app.logger.warning(f"pdfplumber failed, falling back to PyPDF2: {str(e)}")
+                    # Fallback to PyPDF2
+                    with open(temp_path, 'rb') as pdf_file:
+                        pdf_reader = PyPDF2.PdfReader(pdf_file)
+                        file_content = "\n".join([page.extract_text() for page in pdf_reader.pages])
+                
+                # Clean up temporary file
+                os.remove(temp_path)
+                
+        except Exception as e:
+            app.logger.error(f"Error reading file: {str(e)}")
+            return jsonify({"error": f"Error reading file: {str(e)}"}), 500
+
+        if not file_content.strip():
+            return jsonify({"error": "No readable content found in the file"}), 400
+
+        app.logger.info(f"📄 Analyzing documentation with use case: {use_case}")
+        app.logger.info(f"File content length: {len(file_content)} characters")
+
+        # Get list of available technologies from JOB_LIBRARY
+        available_technologies = list(JOB_LIBRARY.keys())
+        
+        completion = client.chat.completions.create(
+            model=azure_openai_deployment,
+            messages=[
+                {
+                    "role": "system",
+                    "content": f"""You are an AI assistant that analyzes documentation to extract workflow requirements and technologies.
+                    Your response must be in JSON format with this structure:
+                    {{
+                        "extracted_use_case": "Detailed use case extracted from documentation",
+                        "suggested_technologies": ["Technology1", "Technology2"],
+                        "workflow_order": ["Technology1", "Technology2"],
+                        "analysis_summary": "Brief summary of the analysis"
+                    }}
+                    
+                    Rules:
+                    1. Only suggest technologies from this exact list: {available_technologies}
+                    2. Extract the most relevant use case details from the documentation
+                    3. Consider both the provided use case and the documentation content
+                    4. Suggest technologies that best match the requirements
+                    5. Provide a logical workflow order based on dependencies
+                    6. Return ONLY the JSON object, no additional text"""
+                },
+                {
+                    "role": "user",
+                    "content": f"""Analyze this documentation and use case to extract workflow requirements and suggest technologies:
+                    
+                    Documentation Content:
+                    {file_content}
+                    
+                    Additional Use Case Context:
+                    {use_case}
+                    
+                    Remember to ONLY use technologies from this list: {available_technologies}
+                    
+                    Return ONLY a JSON object with the extracted use case, suggested technologies, workflow order, and analysis summary."""
+                }
+            ]
+        )
+
+        response_content = completion.choices[0].message.content.strip()
+        
+        try:
+            # Extract JSON from response
+            start = response_content.find('{')
+            end = response_content.rfind('}') + 1
+            json_str = response_content[start:end]
+            analysis_result = json.loads(json_str)
+            
+            # Verify that all suggested technologies are valid
+            valid_technologies = [tech for tech in analysis_result['suggested_technologies'] 
+                                if tech in available_technologies]
+            
+            if not valid_technologies:
+                return jsonify({"error": "No valid technologies found in the analysis"}), 400
+                
+            analysis_result['suggested_technologies'] = valid_technologies
+            analysis_result['workflow_order'] = [tech for tech in analysis_result['workflow_order'] 
+                                               if tech in valid_technologies]
+            
+            return jsonify(analysis_result), 200
+            
+        except json.JSONDecodeError as e:
+            app.logger.error(f"❌ Error parsing AI response: {str(e)}")
+            return jsonify({"error": "Failed to parse AI response"}), 500
+
+    except Exception as e:
+        app.logger.error(f"❌ Error analyzing documentation: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 

@@ -44,6 +44,8 @@ function App() {
     commitMessage: "Update workflow configuration",
     userCode: deployConfig.userCode, // Initialize with deployConfig userCode
   });
+  const [documentationFile, setDocumentationFile] = useState(null);
+  const [analysisResult, setAnalysisResult] = useState(null);
 
   const templateCategories = [
     "Banking, Financial Services, Insurance",
@@ -539,6 +541,59 @@ function App() {
     }
   };
 
+  const handleDocumentationUpload = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      setDocumentationFile(file);
+      setStatus(
+        "Documentation file selected. Click 'Analyze Documentation' to process."
+      );
+    }
+  };
+
+  const analyzeDocumentation = async () => {
+    if (!documentationFile) {
+      setStatus("Please select a documentation file first.");
+      return;
+    }
+
+    setStatus("Analyzing documentation...");
+    setAnalysisResult(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", documentationFile);
+      formData.append("use_case", useCase);
+
+      const response = await fetch(
+        "http://localhost:5000/analyze_documentation",
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to analyze documentation");
+      }
+
+      const result = await response.json();
+      setAnalysisResult(result);
+
+      // Update the workflow with the analysis results
+      setUseCase(result.extracted_use_case);
+      setSelectedTechnologies(result.suggested_technologies);
+      setOptimalOrder(result.workflow_order);
+
+      setStatus("Documentation analyzed successfully!");
+    } catch (error) {
+      console.error("Documentation Analysis Error:", error);
+      setStatus(`Error: ${error.message}`);
+    }
+    setTimeout(() => setStatus(null), 3000);
+  };
+
   const renderWorkflowItem = (tech, index) => {
     const displayName = renamedTechnologies[tech] || tech;
     return (
@@ -984,6 +1039,9 @@ function App() {
       application: template.application || "DMO-GEN",
       subApplication: template.subApplication || "TEST-APP",
     });
+    // Only clear analysis results and talk track, keep file upload capability
+    setAnalysisResult(null);
+    setTalkTrack("");
     setShowUseTemplateModal(false);
     setStatus("Template loaded successfully!");
   };
@@ -1142,6 +1200,45 @@ function App() {
                   placeholder="Describe your use case..."
                   rows="3"
                 />
+                <div className="documentation-upload">
+                  <h5>Upload Documentation (Optional)</h5>
+                  <p>
+                    Upload additional documentation to enhance use case analysis
+                  </p>
+                  <div className="upload-controls">
+                    <input
+                      type="file"
+                      onChange={handleDocumentationUpload}
+                      accept=".txt,.doc,.docx,.pdf"
+                      id="documentation-upload"
+                      style={{ display: "none" }}
+                    />
+                    <label
+                      htmlFor="documentation-upload"
+                      className="upload-button"
+                    >
+                      Choose File
+                    </label>
+                    {documentationFile && (
+                      <span className="file-name">
+                        {documentationFile.name}
+                      </span>
+                    )}
+                    <button
+                      className="action-button"
+                      onClick={analyzeDocumentation}
+                      disabled={!documentationFile}
+                    >
+                      Analyze Documentation
+                    </button>
+                  </div>
+                </div>
+                {analysisResult && (
+                  <div className="analysis-result">
+                    <h5>Analysis Summary</h5>
+                    <p>{analysisResult.analysis_summary}</p>
+                  </div>
+                )}
               </div>
               <div className="option-card template-option">
                 <h4>Use Existing Template</h4>

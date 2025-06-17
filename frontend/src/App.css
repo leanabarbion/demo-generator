@@ -1459,3 +1459,75 @@ input[type="file"] {
   margin: 5px 0;
   line-height: 1.4;
 }
+
+.documentation-upload {
+  margin-top: 20px;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.documentation-upload h5 {
+  color: #2c3e50;
+  margin-bottom: 10px;
+  font-size: 16px;
+}
+
+.documentation-upload p {
+  color: #6c757d;
+  font-size: 14px;
+  margin-bottom: 15px;
+}
+
+.upload-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.upload-button {
+  background-color: #3498db;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.upload-button:hover {
+  background-color: #2980b9;
+}
+
+.file-name {
+  color: #2c3e50;
+  font-size: 14px;
+  margin-left: 10px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analysis-result {
+  margin-top: 15px;
+  padding: 15px;
+  background-color: #e8f4f8;
+  border-radius: 8px;
+  border: 1px solid #b8e2f2;
+}
+
+.analysis-result h5 {
+  color: #2c3e50;
+  margin-bottom: 10px;
+  font-size: 16px;
+}
+
+.analysis-result p {
+  color: #2c3e50;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+}
