@@ -8,6 +8,7 @@ import techCategories from "./categories";
 function App() {
   const [workflow, setWorkflow] = useState([]);
   const [useCase, setUseCase] = useState("");
+  const [userCode, setUserCode] = useState("");
   const [status, setStatus] = useState(null);
   const [optimalOrder, setOptimalOrder] = useState(null);
   const [narrative, setNarrative] = useState("");
@@ -23,12 +24,11 @@ function App() {
   const [templateCategory, setTemplateCategory] = useState("");
   const [templates, setTemplates] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("");
-  const [workflowType, setWorkflowType] = useState("new"); // 'new', 'upload', or 'ai'
+  const [workflowType, setWorkflowType] = useState("new"); // 'new', 'upload', 'ai', 'documentation', or 'templates'
   const [showInstructions, setShowInstructions] = useState(true);
   const [deployConfig, setDeployConfig] = useState({
     environment: "saas_dev",
     userCode: "LBA",
-    folderName: "DEMGEN_VB",
     controlm_server: "IN01", // Add default Control-M server
   });
   const fileInputRef = useRef(null);
@@ -46,6 +46,10 @@ function App() {
   });
   const [documentationFile, setDocumentationFile] = useState(null);
   const [analysisResult, setAnalysisResult] = useState(null);
+  const [aiResponseContent, setAiResponseContent] = useState(null);
+  const [aiWorkflowData, setAiWorkflowData] = useState(null);
+  const [isGeneratingAIWorkflow, setIsGeneratingAIWorkflow] = useState(false);
+  const [isDeployingAIWorkflow, setIsDeployingAIWorkflow] = useState(false);
 
   const templateCategories = [
     "Banking, Financial Services, Insurance",
@@ -74,7 +78,7 @@ function App() {
     }
 
     try {
-      setStatus("Generating optimal order...");
+      setStatus("Generating Logical order...");
       const response = await fetch(
         "http://localhost:5000/generate_optimal_order",
         {
@@ -90,16 +94,16 @@ function App() {
       );
 
       if (!response.ok) {
-        throw new Error("Failed to generate optimal order");
+        throw new Error("Failed to generate Logical order");
       }
 
       const data = await response.json();
       setOptimalOrder(data.optimal_order);
-      setStatus("Optimal order generated successfully!");
+      setStatus("Logical order generated successfully!");
       setTimeout(() => setStatus(null), 3000);
     } catch (error) {
-      console.error("Error generating optimal order:", error);
-      setStatus("Failed to generate optimal order. Please try again.");
+      console.error("Error generating Logical order:", error);
+      setStatus("Failed to generate Logical order. Please try again.");
       setTimeout(() => setStatus(null), 3000);
     }
   };
@@ -387,7 +391,7 @@ function App() {
     setStatus("Generating proposed workflow...");
     setProposedWorkflow(null);
     setSelectedTechnologies([]); // Clear existing selected technologies
-    setOptimalOrder(null); // Clear any existing optimal order
+    setOptimalOrder(null); // Clear any existing Logical order
 
     try {
       const response = await fetch("http://localhost:5000/proposed_workflow", {
@@ -415,7 +419,7 @@ function App() {
       try {
         const data = JSON.parse(fullResponse);
         if (data.technologies && data.workflow_order) {
-          // Update both the workflow and optimal order
+          // Update both the workflow and Logical order
           setSelectedTechnologies(data.technologies);
           setOptimalOrder(data.workflow_order);
           setProposedWorkflow(data);
@@ -601,7 +605,7 @@ function App() {
               <li>
                 <span className="step-number">3</span>
                 <span className="step-text">
-                  Click "Generate Optimal Order" to determine the best execution
+                  Click "Generate Logical order" to determine the best execution
                   sequence
                 </span>
               </li>
@@ -614,7 +618,13 @@ function App() {
               <li>
                 <span className="step-number">5</span>
                 <span className="step-text">
-                  Deploy your workflow or download the JSON configuration
+                  Generate narrative and talk track for presentations
+                </span>
+              </li>
+              <li>
+                <span className="step-number">6</span>
+                <span className="step-text">
+                  Deploy your workflow, save as template, or upload to GitHub
                 </span>
               </li>
             </ol>
@@ -678,19 +688,26 @@ function App() {
               <li>
                 <span className="step-number">3</span>
                 <span className="step-text">
-                  Review the extracted technologies technologies
+                  Review the extracted technologies
                 </span>
               </li>
               <li>
                 <span className="step-number">4</span>
                 <span className="step-text">
                   Modify the workflow if needed by adding or removing
+                  technologies
                 </span>
               </li>
               <li>
                 <span className="step-number">5</span>
                 <span className="step-text">
-                  Generate optimal order or deploy directly
+                  Generate Logical order, narrative, and talk track
+                </span>
+              </li>
+              <li>
+                <span className="step-number">6</span>
+                <span className="step-text">
+                  Deploy your workflow or save as template
                 </span>
               </li>
             </ol>
@@ -710,7 +727,7 @@ function App() {
               <li>
                 <span className="step-number">2</span>
                 <span className="step-text">
-                  Click "Ask AI for Technologies Suggestions" to get technology
+                  Click "Ask AI for Technology Suggestions" to get technology
                   suggestions based on your use case
                 </span>
               </li>
@@ -723,13 +740,63 @@ function App() {
               <li>
                 <span className="step-number">4</span>
                 <span className="step-text">
-                  Generate optimal order and personalize workflow names
+                  Generate Logical order and personalize workflow names
                 </span>
               </li>
               <li>
                 <span className="step-number">5</span>
                 <span className="step-text">
-                  Deploy your workflow or download the JSON configuration
+                  Generate narrative and talk track for presentations
+                </span>
+              </li>
+              <li>
+                <span className="step-number">6</span>
+                <span className="step-text">
+                  Deploy your workflow, save as template, or upload to GitHub
+                </span>
+              </li>
+            </ol>
+          </div>
+        );
+      case "documentation":
+        return (
+          <div className="workflow-instructions">
+            <h3>Documentation Analysis:</h3>
+            <ol>
+              <li>
+                <span className="step-number">1</span>
+                <span className="step-text">
+                  Enter your use case in the text area below
+                </span>
+              </li>
+              <li>
+                <span className="step-number">2</span>
+                <span className="step-text">
+                  Upload documentation files (PDF, DOC, DOCX, TXT) for analysis
+                </span>
+              </li>
+              <li>
+                <span className="step-number">3</span>
+                <span className="step-text">
+                  Review AI-extracted use case and suggested technologies
+                </span>
+              </li>
+              <li>
+                <span className="step-number">4</span>
+                <span className="step-text">
+                  Modify the suggested workflow if needed
+                </span>
+              </li>
+              <li>
+                <span className="step-number">5</span>
+                <span className="step-text">
+                  Generate Logical order, narrative, and talk track
+                </span>
+              </li>
+              <li>
+                <span className="step-number">6</span>
+                <span className="step-text">
+                  Deploy your workflow or save as template
                 </span>
               </li>
             </ol>
@@ -1119,6 +1186,168 @@ function App() {
     }
   };
 
+  const generateAIWorkflow = async () => {
+    if (!useCase.trim()) {
+      setStatus("Please enter a use case first.");
+      setTimeout(() => setStatus(""), 3000);
+      return;
+    }
+
+    try {
+      setIsGeneratingAIWorkflow(true);
+      setStatus("🤖 Generating AI workflow...");
+
+      const response = await fetch("http://localhost:5000/ai_prompt_workflow", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          use_case: useCase,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to generate AI workflow");
+      }
+
+      const data = await response.json();
+      setAiResponseContent(data.response_content);
+      setStatus(
+        "✅ AI workflow generated successfully! Review and deploy when ready."
+      );
+      setTimeout(() => setStatus(""), 5000);
+    } catch (error) {
+      console.error("AI workflow generation error:", error);
+      setStatus(`❌ Error: ${error.message}`);
+      setTimeout(() => setStatus(""), 3000);
+    } finally {
+      setIsGeneratingAIWorkflow(false);
+    }
+  };
+
+  const regenerateAIWorkflow = async () => {
+    if (!useCase.trim()) {
+      setStatus("Please enter a use case first.");
+      setTimeout(() => setStatus(""), 3000);
+      return;
+    }
+
+    try {
+      setIsGeneratingAIWorkflow(true);
+      setStatus("🔄 Regenerating AI workflow...");
+
+      // Clear the deployment status when regenerating
+      setAiWorkflowData(null);
+
+      const response = await fetch("http://localhost:5000/ai_prompt_workflow", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          use_case: useCase,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to regenerate AI workflow");
+      }
+
+      const data = await response.json();
+      setAiResponseContent(data.response_content);
+      setStatus("✅ AI workflow regenerated successfully!");
+      setTimeout(() => setStatus(""), 3000);
+    } catch (error) {
+      console.error("AI workflow regeneration error:", error);
+      setStatus(`❌ Error: ${error.message}`);
+      setTimeout(() => setStatus(""), 3000);
+    } finally {
+      setIsGeneratingAIWorkflow(false);
+    }
+  };
+
+  const deployAIWorkflow = async () => {
+    if (!aiResponseContent) {
+      setStatus("Please generate an AI workflow first.");
+      setTimeout(() => setStatus(""), 3000);
+      return;
+    }
+
+    try {
+      setIsDeployingAIWorkflow(true);
+      setStatus("🚀 Deploying AI workflow...");
+
+      const response = await fetch("http://localhost:5000/deploy_ai_workflow", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          response_content: aiResponseContent,
+          use_case: useCase,
+          environment: deployConfig.environment,
+          user_code: userCode,
+          folder_name: deployConfig.folderName,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to deploy AI workflow");
+      }
+
+      const data = await response.json();
+      setAiWorkflowData(data);
+      setStatus("✅ AI workflow deployed successfully!");
+      setTimeout(() => setStatus(""), 3000);
+    } catch (error) {
+      console.error("AI workflow deployment error:", error);
+      setStatus(`❌ Error: ${error.message}`);
+      setTimeout(() => setStatus(""), 3000);
+    } finally {
+      setIsDeployingAIWorkflow(false);
+    }
+  };
+
+  const parseAIWorkflow = (responseContent) => {
+    try {
+      // Extract JSON from response
+      const start = responseContent.indexOf("{");
+      const end = responseContent.lastIndexOf("}") + 1;
+      const jsonStr = responseContent.substring(start, end);
+      const aiWorkflow = JSON.parse(jsonStr);
+
+      return {
+        subfolders: aiWorkflow.subfolders || [],
+        jobs: aiWorkflow.jobs || [],
+        isValid: true,
+      };
+    } catch (error) {
+      console.error("Error parsing AI workflow:", error);
+      return {
+        subfolders: [],
+        jobs: [],
+        isValid: false,
+        error: error.message,
+      };
+    }
+  };
+
+  const renderAIWorkflowItem = (job, index) => {
+    return (
+      <div key={job.id} className="ai-workflow-job">
+        <div className="job-header">
+          <span className="job-number">{index + 1}</span>
+          <span className="job-name">{job.name}</span>
+          <span className="job-type">{job.type}</span>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="app-container">
       <div className="content-container">
@@ -1159,6 +1388,14 @@ function App() {
             >
               Ask AI
             </button>
+            <button
+              className={`workflow-type-button ${
+                workflowType === "documentation" ? "active" : ""
+              }`}
+              onClick={() => handleWorkflowTypeChange("documentation")}
+            >
+              Documentation Analysis
+            </button>
           </div>
 
           {showInstructions && renderInstructions()}
@@ -1169,12 +1406,54 @@ function App() {
               <div className="option-card new-use-case">
                 <h4>Enter New Use Case</h4>
                 <p>Describe your specific workflow requirements</p>
+                <div className="user-code-input">
+                  <label htmlFor="user-code">User Code:</label>
+                  <input
+                    type="text"
+                    id="user-code"
+                    value={userCode}
+                    onChange={(e) => setUserCode(e.target.value)}
+                    placeholder="Enter user code (e.g., LBA)"
+                    maxLength="10"
+                  />
+                </div>
                 <textarea
                   value={useCase}
                   onChange={(e) => setUseCase(e.target.value)}
                   placeholder="Describe your use case..."
                   rows="3"
                 />
+                <div className="ai-workflow-buttons">
+                  <button
+                    className="action-button ai-generate-button"
+                    onClick={generateAIWorkflow}
+                    disabled={!useCase.trim() || isGeneratingAIWorkflow}
+                  >
+                    {isGeneratingAIWorkflow
+                      ? "🤖 Generating..."
+                      : "Ask AI to Generate Workflow"}
+                  </button>
+                  {aiResponseContent && (
+                    <button
+                      className="action-button ai-regenerate-button"
+                      onClick={regenerateAIWorkflow}
+                      disabled={!useCase.trim() || isGeneratingAIWorkflow}
+                    >
+                      {isGeneratingAIWorkflow
+                        ? "🔄 Regenerating..."
+                        : "Regenerate"}
+                    </button>
+                  )}
+                </div>
+                {aiResponseContent && (
+                  <div className="ai-workflow-status">
+                    <h5>✅ AI Workflow Generated</h5>
+                    <p>
+                      AI has generated a workflow based on your use case. You
+                      can now deploy it in the "Deploy or Export" section.
+                    </p>
+                  </div>
+                )}
                 <div className="documentation-upload">
                   <h5>Upload Documentation (Optional)</h5>
                   <p>
@@ -1274,61 +1553,8 @@ function App() {
           </div>
         </div>
 
-        {/* RIGHT: Selected Techs + Optimal Order + Narrative */}
+        {/* RIGHT: Selected Techs + Logical order + Narrative */}
         <div className="right-column">
-          <div className="workflow-container">
-            {selectedTechnologies.length > 0 && (
-              <div className="selected-technologies">
-                <h3>Selected Technologies:</h3>
-                <div className="workflow-list">
-                  {selectedTechnologies.map((tech, index) => (
-                    <div
-                      key={tech}
-                      className={`workflow-item ${
-                        proposedWorkflow?.technologies?.includes(tech)
-                          ? "ai-suggested"
-                          : ""
-                      }`}
-                      title={JOB_LIBRARY[tech]?.description || tech}
-                    >
-                      <span className="tech-name">
-                        {renamedTechnologies[tech] || tech}
-                        <span className="original-name">({tech})</span>
-                      </span>
-                      <button
-                        className="remove-tech"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleTechnologyInWorkflow(tech);
-                        }}
-                        title="Remove technology"
-                      >
-                        ❌
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                {proposedWorkflow?.technologies && (
-                  <div className="ai-suggestion-note">
-                    <span className="ai-badge">AI</span>
-                    <span>AI-suggested technologies are highlighted</span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {optimalOrder && (
-              <div className="optimal-workflow">
-                <h3>Logical Order based on Use Case:</h3>
-                <ol className="ordered-list">
-                  {optimalOrder.map((tech, index) =>
-                    renderWorkflowItem(tech, index)
-                  )}
-                </ol>
-              </div>
-            )}
-          </div>
-
           <div className="workflow-actions">
             <div className="workflow-menu">
               {/* Workflow Management Section */}
@@ -1392,6 +1618,15 @@ function App() {
                   >
                     Save as Template
                   </button>
+                  <button
+                    className="action-button ai-deploy-button"
+                    onClick={deployAIWorkflow}
+                    disabled={!aiResponseContent || isDeployingAIWorkflow}
+                  >
+                    {isDeployingAIWorkflow
+                      ? "🚀 Deploying..."
+                      : "Deploy AI Workflow"}
+                  </button>
                 </div>
               </div>
 
@@ -1417,8 +1652,215 @@ function App() {
               </div>
             </div>
           </div>
-
           {status && <p className="status-message">{status}</p>}
+
+          <div className="workflow-container">
+            {selectedTechnologies.length > 0 && (
+              <div className="selected-technologies">
+                <h3>Selected Technologies:</h3>
+                <div className="workflow-list">
+                  {selectedTechnologies.map((tech, index) => (
+                    <div
+                      key={tech}
+                      className={`workflow-item ${
+                        proposedWorkflow?.technologies?.includes(tech)
+                          ? "ai-suggested"
+                          : ""
+                      }`}
+                      title={JOB_LIBRARY[tech]?.description || tech}
+                    >
+                      <span className="tech-name">
+                        {renamedTechnologies[tech] || tech}
+                        <span className="original-name">({tech})</span>
+                      </span>
+                      <button
+                        className="remove-tech"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleTechnologyInWorkflow(tech);
+                        }}
+                        title="Remove technology"
+                      >
+                        ❌
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                {proposedWorkflow?.technologies && (
+                  <div className="ai-suggestion-note">
+                    <span className="ai-badge">AI</span>
+                    <span>AI-suggested technologies are highlighted</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {optimalOrder && (
+              <div className="optimal-workflow">
+                <h3>Logical Order based on Use Case:</h3>
+                <ol className="ordered-list">
+                  {optimalOrder.map((tech, index) =>
+                    renderWorkflowItem(tech, index)
+                  )}
+                </ol>
+              </div>
+            )}
+
+            {aiResponseContent && (
+              <div className="ai-workflow-display">
+                <h3>🤖 AI Generated Workflow</h3>
+                {/* Deployment Status - Moved before AI workflow */}
+                {aiWorkflowData && (
+                  <div className="ai-deployment-status">
+                    <h4>✅ Deployment Status</h4>
+                    <div className="deployment-details">
+                      <p>
+                        <strong>Folder:</strong> {aiWorkflowData.folder_name}
+                      </p>
+                      <p>
+                        <strong>Environment:</strong>{" "}
+                        {aiWorkflowData.environment}
+                      </p>
+                      <p>
+                        <strong>Control-M Server:</strong>{" "}
+                        {aiWorkflowData.controlm_server}
+                      </p>
+                      <p>
+                        <strong>Status:</strong>{" "}
+                        {aiWorkflowData.workflow?.name
+                          ? "Successfully deployed"
+                          : "Deployment failed"}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {(() => {
+                  const parsedWorkflow = parseAIWorkflow(aiResponseContent);
+                  if (!parsedWorkflow.isValid) {
+                    return (
+                      <div className="ai-workflow-error">
+                        <p>
+                          ❌ Error parsing AI workflow: {parsedWorkflow.error}
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="ai-workflow-content">
+                      {/* Subfolders Section */}
+
+                      {/* Jobs Section */}
+                      {parsedWorkflow.jobs.length > 0 && (
+                        <div className="ai-jobs">
+                          <h4>
+                            Workflow Jobs ({parsedWorkflow.jobs.length} total)
+                          </h4>
+                          <div className="jobs-by-subfolder">
+                            {parsedWorkflow.subfolders.map(
+                              (subfolder, subfolderIndex) => {
+                                // Filter jobs for this subfolder
+                                const subfolderJobs =
+                                  parsedWorkflow.jobs.filter(
+                                    (job) => job.subfolder === subfolder.name
+                                  );
+
+                                if (subfolderJobs.length === 0) return null;
+
+                                return (
+                                  <div
+                                    key={subfolderIndex}
+                                    className="subfolder-jobs"
+                                  >
+                                    <div className="subfolder-jobs-header">
+                                      <div className="subfolder-jobs-info">
+                                        <span className="subfolder-jobs-title">
+                                          📁 {subfolder.name} (
+                                          {subfolderJobs.length} jobs)
+                                        </span>
+                                        {subfolder.description && (
+                                          <span className="subfolder-jobs-description">
+                                            {subfolder.description}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="subfolder-jobs-list">
+                                      {subfolderJobs.map((job, jobIndex) => (
+                                        <div
+                                          key={job.id}
+                                          className="ai-workflow-job"
+                                        >
+                                          <div className="job-header">
+                                            <span className="job-number">
+                                              {jobIndex + 1}
+                                            </span>
+                                            <span className="job-name">
+                                              {job.name}
+                                            </span>
+                                            <span className="job-type">
+                                              {job.type}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              }
+                            )}
+
+                            {/* Show jobs that don't belong to any subfolder */}
+                            {(() => {
+                              const orphanJobs = parsedWorkflow.jobs.filter(
+                                (job) =>
+                                  !parsedWorkflow.subfolders.some(
+                                    (subfolder) =>
+                                      subfolder.name === job.subfolder
+                                  )
+                              );
+
+                              if (orphanJobs.length === 0) return null;
+
+                              return (
+                                <div className="subfolder-jobs">
+                                  <div className="subfolder-jobs-header">
+                                    <span className="subfolder-jobs-title">
+                                      📁 Main Folder ({orphanJobs.length} jobs)
+                                    </span>
+                                  </div>
+                                  <div className="subfolder-jobs-list">
+                                    {orphanJobs.map((job, jobIndex) => (
+                                      <div
+                                        key={job.id}
+                                        className="ai-workflow-job"
+                                      >
+                                        <div className="job-header">
+                                          <span className="job-number">
+                                            {jobIndex + 1}
+                                          </span>
+                                          <span className="job-name">
+                                            {job.name}
+                                          </span>
+                                          <span className="job-type">
+                                            {job.type}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+          </div>
 
           {narrative && (
             <div className="narrative-display">
