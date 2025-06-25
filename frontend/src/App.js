@@ -4,6 +4,9 @@ import TechnologyGrid from "./TechnologyGrid";
 import { marked } from "marked";
 import { JOB_LIBRARY } from "./jobLibrary";
 import techCategories from "./categories";
+import ViewSelector from "./components/ViewSelector";
+import AIWorkflowView from "./components/AIWorkflowView";
+import ManualWorkflowView from "./components/ManualWorkflowView";
 
 function App() {
   const [workflow, setWorkflow] = useState([]);
@@ -42,7 +45,7 @@ function App() {
     branch: "main",
     path: "workflows",
     commitMessage: "Update workflow configuration",
-    userCode: deployConfig.userCode, // Initialize with deployConfig userCode
+    userCode: "LBA", // Default value, will be overridden by main userCode state
   });
   const [documentationFile, setDocumentationFile] = useState(null);
   const [analysisResult, setAnalysisResult] = useState(null);
@@ -50,6 +53,7 @@ function App() {
   const [aiWorkflowData, setAiWorkflowData] = useState(null);
   const [isGeneratingAIWorkflow, setIsGeneratingAIWorkflow] = useState(false);
   const [isDeployingAIWorkflow, setIsDeployingAIWorkflow] = useState(false);
+  const [selectedView, setSelectedView] = useState(null); // 'ai' or 'manual'
 
   const templateCategories = [
     "Banking, Financial Services, Insurance",
@@ -226,7 +230,7 @@ function App() {
         jobs: selectedTechnologies,
         environment: deployConfig.environment,
         folder_name: deployConfig.folderName,
-        user_code: deployConfig.userCode,
+        user_code: userCode,
       };
 
       console.log("Sending deployment request with body:", requestBody);
@@ -306,7 +310,7 @@ function App() {
             renamed_technologies: renamedTechnologies,
             optimal_order: optimalOrder || selectedTechnologies,
             environment: deployConfig.environment,
-            user_code: deployConfig.userCode,
+            user_code: userCode,
             folder_name: deployConfig.folderName,
             application: deployConfig.application,
             sub_application: deployConfig.subApplication,
@@ -349,7 +353,7 @@ function App() {
           jobs: selectedTechnologies,
           environment: deployConfig.environment,
           folder_name: deployConfig.folderName,
-          user_code: deployConfig.userCode,
+          user_code: userCode,
         }),
       });
 
@@ -365,7 +369,7 @@ function App() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `workflow_${deployConfig.userCode}_${deployConfig.folderName}.json`;
+      a.download = `workflow_${userCode}_${deployConfig.folderName}.json`;
       document.body.appendChild(a);
       a.click();
 
@@ -904,7 +908,7 @@ function App() {
       narrative: narrative,
       renamedTechnologies: renamedTechnologies,
       environment: deployConfig.environment,
-      userCode: deployConfig.userCode,
+      userCode: userCode,
       folderName: deployConfig.folderName,
       application: deployConfig.application,
       subApplication: deployConfig.subApplication,
@@ -925,7 +929,7 @@ function App() {
           narrative: narrative,
           renamedTechnologies: renamedTechnologies,
           environment: deployConfig.environment,
-          userCode: deployConfig.userCode,
+          userCode: userCode,
           folderName: deployConfig.folderName,
           application: deployConfig.application,
           subApplication: deployConfig.subApplication,
@@ -980,7 +984,7 @@ function App() {
           narrative: narrative,
           renamedTechnologies: renamedTechnologies,
           environment: deployConfig.environment,
-          userCode: deployConfig.userCode,
+          userCode: userCode,
           folderName: deployConfig.folderName,
           application: deployConfig.application,
           subApplication: deployConfig.subApplication,
@@ -1007,7 +1011,7 @@ function App() {
             narrative: narrative,
             renamedTechnologies: renamedTechnologies,
             environment: deployConfig.environment,
-            userCode: deployConfig.userCode,
+            userCode: userCode,
             folderName: deployConfig.folderName,
             application: deployConfig.application,
             subApplication: deployConfig.subApplication,
@@ -1074,12 +1078,13 @@ function App() {
     setUseCase(template.useCase);
     setNarrative(template.narrative);
     setRenamedTechnologies(template.renamedTechnologies);
+    setUserCode(template.userCode || "LBA");
     setDeployConfig({
       environment: template.environment || "saas_dev",
-      userCode: template.userCode || "LBA",
-      folderName: template.folderName || "DEMGEN_VB",
-      application: template.application || "DMO-GEN",
-      subApplication: template.subApplication || "TEST-APP",
+      userCode: "LBA", // Keep default for deployConfig
+      folderName: template.folderName || "demo-genai",
+      application: template.application || "demo-genai",
+      subApplication: template.subApplication || "demo-genai",
     });
     // Only clear analysis results and talk track, keep file upload capability
     setAnalysisResult(null);
@@ -1141,7 +1146,7 @@ function App() {
             renamed_technologies: renamedTechnologies,
             optimal_order: optimalOrder || selectedTechnologies,
             environment: deployConfig.environment,
-            user_code: githubConfig.userCode,
+            user_code: userCode,
             folder_name: deployConfig.folderName,
             application: deployConfig.application,
             sub_application: deployConfig.subApplication,
@@ -1165,7 +1170,7 @@ function App() {
           },
           body: JSON.stringify({
             narrative_text: narrative,
-            user_info: githubConfig.userCode,
+            user_info: userCode,
           }),
         }
       );
@@ -1350,890 +1355,114 @@ function App() {
 
   return (
     <div className="app-container">
-      <div className="content-container">
-        {/* LEFT: Title + Use Case + Grid */}
-        <div className="left-column">
-          <h1>Demonstration Generator</h1>
-
-          <div className="workflow-type-selector">
-            <button
-              className={`workflow-type-button ${
-                workflowType === "new" ? "active" : ""
-              }`}
-              onClick={() => handleWorkflowTypeChange("new")}
-            >
-              Create New
-            </button>
-            <button
-              className={`workflow-type-button ${
-                workflowType === "templates" ? "active" : ""
-              }`}
-              onClick={() => handleWorkflowTypeChange("templates")}
-            >
-              Use Templates
-            </button>
-            <button
-              className={`workflow-type-button ${
-                workflowType === "upload" ? "active" : ""
-              }`}
-              onClick={() => handleWorkflowTypeChange("upload")}
-            >
-              Upload Existing
-            </button>
-            <button
-              className={`workflow-type-button ${
-                workflowType === "ai" ? "active" : ""
-              }`}
-              onClick={() => handleWorkflowTypeChange("ai")}
-            >
-              Ask AI
-            </button>
-            <button
-              className={`workflow-type-button ${
-                workflowType === "documentation" ? "active" : ""
-              }`}
-              onClick={() => handleWorkflowTypeChange("documentation")}
-            >
-              Documentation Analysis
-            </button>
-          </div>
-
-          {showInstructions && renderInstructions()}
-
-          <div className="use-case-section">
-            <h3>Start Your Workflow</h3>
-            <div className="use-case-options">
-              <div className="option-card new-use-case">
-                <h4>Enter New Use Case</h4>
-                <p>Describe your specific workflow requirements</p>
-                <div className="user-code-input">
-                  <label htmlFor="user-code">User Code:</label>
-                  <input
-                    type="text"
-                    id="user-code"
-                    value={userCode}
-                    onChange={(e) => setUserCode(e.target.value)}
-                    placeholder="Enter user code (e.g., LBA)"
-                    maxLength="10"
-                  />
-                </div>
-                <textarea
-                  value={useCase}
-                  onChange={(e) => setUseCase(e.target.value)}
-                  placeholder="Describe your use case..."
-                  rows="3"
-                />
-                <div className="ai-workflow-buttons">
-                  <button
-                    className="action-button ai-generate-button"
-                    onClick={generateAIWorkflow}
-                    disabled={!useCase.trim() || isGeneratingAIWorkflow}
-                  >
-                    {isGeneratingAIWorkflow
-                      ? "🤖 Generating..."
-                      : "Ask AI to Generate Workflow"}
-                  </button>
-                  {aiResponseContent && (
-                    <button
-                      className="action-button ai-regenerate-button"
-                      onClick={regenerateAIWorkflow}
-                      disabled={!useCase.trim() || isGeneratingAIWorkflow}
-                    >
-                      {isGeneratingAIWorkflow
-                        ? "🔄 Regenerating..."
-                        : "Regenerate"}
-                    </button>
-                  )}
-                </div>
-                {aiResponseContent && (
-                  <div className="ai-workflow-status">
-                    <h5>✅ AI Workflow Generated</h5>
-                    <p>
-                      AI has generated a workflow based on your use case. You
-                      can now deploy it in the "Deploy or Export" section.
-                    </p>
-                  </div>
-                )}
-                <div className="documentation-upload">
-                  <h5>Upload Documentation (Optional)</h5>
-                  <p>
-                    Upload additional documentation to enhance use case analysis
-                  </p>
-                  <div className="upload-controls">
-                    <input
-                      type="file"
-                      onChange={handleDocumentationUpload}
-                      accept=".txt,.doc,.docx,.pdf"
-                      id="documentation-upload"
-                      style={{ display: "none" }}
-                    />
-                    <label
-                      htmlFor="documentation-upload"
-                      className="upload-button"
-                    >
-                      Choose File
-                    </label>
-                    {documentationFile && (
-                      <span className="file-name">
-                        {documentationFile.name}
-                      </span>
-                    )}
-                    <button
-                      className="action-button"
-                      onClick={analyzeDocumentation}
-                      disabled={!documentationFile}
-                    >
-                      Analyze Documentation
-                    </button>
-                  </div>
-                </div>
-                {analysisResult && (
-                  <div className="analysis-result">
-                    <h5>Analysis Summary</h5>
-                    <p>{analysisResult.analysis_summary}</p>
-                  </div>
-                )}
-              </div>
-              <div className="option-card template-option">
-                <h4>Use Existing Template</h4>
-                <p>Start from a pre-configured workflow template</p>
-                <button
-                  className="action-button template-button"
-                  onClick={handleUseTemplate}
-                >
-                  Browse Templates
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="technology-selection">
-            <h3>Select your technologies</h3>
-            <div className="technology-selection-header">
-              <div className="technology-category-filter">
-                <select
-                  value={selectedTechCategory}
-                  onChange={(e) => setSelectedTechCategory(e.target.value)}
-                  className="category-select"
-                >
-                  <option value="">All Categories</option>
-                  {techCategories.map((category) => (
-                    <option key={category.name} value={category.name}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <button
-                className="action-button"
-                onClick={generateProposedWorkflow}
-                disabled={!useCase}
-              >
-                Ask AI for Technology Suggestions
-              </button>
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileUpload}
-                accept=".json"
-                style={{ display: "none" }}
-              />
-              <button
-                className="action-button"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                Upload Workflow JSON
-              </button>
-            </div>
-            <TechnologyGrid
-              selectedIcons={selectedTechnologies}
-              onToggle={toggleTechnologyInWorkflow}
-              selectedCategory={selectedTechCategory}
-            />
-          </div>
-        </div>
-
-        {/* RIGHT: Selected Techs + Logical order + Narrative */}
-        <div className="right-column">
-          <div className="workflow-actions">
-            <div className="workflow-menu">
-              {/* Workflow Management Section */}
-              <div className="menu-section">
-                <h4 className="menu-title">Manage Workflow</h4>
-                <div className="menu-buttons">
-                  <button
-                    className="action-button"
-                    onClick={generateOptimalOrder}
-                    disabled={!selectedTechnologies.length || !useCase}
-                  >
-                    Generate Logical Order
-                  </button>
-                  <button
-                    className="action-button"
-                    onClick={handlePersonalizeUseCase}
-                    disabled={!selectedTechnologies.length || !useCase}
-                  >
-                    Personalize Workflow Names
-                  </button>
-                </div>
-              </div>
-
-              {/* Deployment Section */}
-              <div className="menu-section">
-                <h4 className="menu-title">Deploy or Export</h4>
-                <div className="menu-buttons">
-                  <button
-                    className="action-button"
-                    onClick={handleDownloadWorkflow}
-                    disabled={!selectedTechnologies.length || !useCase}
-                  >
-                    Download Workflow JSON
-                  </button>
-                  <button
-                    className="action-button"
-                    onClick={handleDeployPersonalizedWorkflow}
-                    disabled={
-                      !selectedTechnologies.length ||
-                      !useCase ||
-                      !renamedTechnologies
-                    }
-                  >
-                    Deploy Workflow to Control-M
-                  </button>
-                  <button
-                    className="action-button"
-                    onClick={() => setShowGithubModal(true)}
-                    disabled={
-                      !selectedTechnologies.length || !useCase || !narrative
-                    }
-                  >
-                    Upload to GitHub
-                  </button>
-                  <button
-                    className="action-button"
-                    onClick={() => {
-                      setShowTemplateModal(true);
-                    }}
-                    disabled={!selectedTechnologies.length || !useCase}
-                  >
-                    Save as Template
-                  </button>
-                  <button
-                    className="action-button ai-deploy-button"
-                    onClick={deployAIWorkflow}
-                    disabled={!aiResponseContent || isDeployingAIWorkflow}
-                  >
-                    {isDeployingAIWorkflow
-                      ? "🚀 Deploying..."
-                      : "Deploy AI Workflow"}
-                  </button>
-                </div>
-              </div>
-
-              {/* Documentation Section */}
-              <div className="menu-section">
-                <h4 className="menu-title">Documentation</h4>
-                <div className="menu-buttons">
-                  <button
-                    className="action-button"
-                    onClick={generateNarrative}
-                    disabled={!selectedTechnologies.length || !useCase}
-                  >
-                    Generate Documentation
-                  </button>
-                  <button
-                    className="action-button"
-                    onClick={generateTalkTrack}
-                    disabled={!selectedTechnologies.length || !useCase}
-                  >
-                    Generate Talk Track
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-          {status && <p className="status-message">{status}</p>}
-
-          <div className="workflow-container">
-            {selectedTechnologies.length > 0 && (
-              <div className="selected-technologies">
-                <h3>Selected Technologies:</h3>
-                <div className="workflow-list">
-                  {selectedTechnologies.map((tech, index) => (
-                    <div
-                      key={tech}
-                      className={`workflow-item ${
-                        proposedWorkflow?.technologies?.includes(tech)
-                          ? "ai-suggested"
-                          : ""
-                      }`}
-                      title={JOB_LIBRARY[tech]?.description || tech}
-                    >
-                      <span className="tech-name">
-                        {renamedTechnologies[tech] || tech}
-                        <span className="original-name">({tech})</span>
-                      </span>
-                      <button
-                        className="remove-tech"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleTechnologyInWorkflow(tech);
-                        }}
-                        title="Remove technology"
-                      >
-                        ❌
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                {proposedWorkflow?.technologies && (
-                  <div className="ai-suggestion-note">
-                    <span className="ai-badge">AI</span>
-                    <span>AI-suggested technologies are highlighted</span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {optimalOrder && (
-              <div className="optimal-workflow">
-                <h3>Logical Order based on Use Case:</h3>
-                <ol className="ordered-list">
-                  {optimalOrder.map((tech, index) =>
-                    renderWorkflowItem(tech, index)
-                  )}
-                </ol>
-              </div>
-            )}
-
-            {aiResponseContent && (
-              <div className="ai-workflow-display">
-                <h3>🤖 AI Generated Workflow</h3>
-                {/* Deployment Status - Moved before AI workflow */}
-                {aiWorkflowData && (
-                  <div className="ai-deployment-status">
-                    <h4>✅ Deployment Status</h4>
-                    <div className="deployment-details">
-                      <p>
-                        <strong>Folder:</strong> {aiWorkflowData.folder_name}
-                      </p>
-                      <p>
-                        <strong>Environment:</strong>{" "}
-                        {aiWorkflowData.environment}
-                      </p>
-                      <p>
-                        <strong>Control-M Server:</strong>{" "}
-                        {aiWorkflowData.controlm_server}
-                      </p>
-                      <p>
-                        <strong>Status:</strong>{" "}
-                        {aiWorkflowData.workflow?.name
-                          ? "Successfully deployed"
-                          : "Deployment failed"}
-                      </p>
-                    </div>
-                  </div>
-                )}
-                {(() => {
-                  const parsedWorkflow = parseAIWorkflow(aiResponseContent);
-                  if (!parsedWorkflow.isValid) {
-                    return (
-                      <div className="ai-workflow-error">
-                        <p>
-                          ❌ Error parsing AI workflow: {parsedWorkflow.error}
-                        </p>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div className="ai-workflow-content">
-                      {/* Subfolders Section */}
-
-                      {/* Jobs Section */}
-                      {parsedWorkflow.jobs.length > 0 && (
-                        <div className="ai-jobs">
-                          <h4>
-                            Workflow Jobs ({parsedWorkflow.jobs.length} total)
-                          </h4>
-                          <div className="jobs-by-subfolder">
-                            {parsedWorkflow.subfolders.map(
-                              (subfolder, subfolderIndex) => {
-                                // Filter jobs for this subfolder
-                                const subfolderJobs =
-                                  parsedWorkflow.jobs.filter(
-                                    (job) => job.subfolder === subfolder.name
-                                  );
-
-                                if (subfolderJobs.length === 0) return null;
-
-                                return (
-                                  <div
-                                    key={subfolderIndex}
-                                    className="subfolder-jobs"
-                                  >
-                                    <div className="subfolder-jobs-header">
-                                      <div className="subfolder-jobs-info">
-                                        <span className="subfolder-jobs-title">
-                                          📁 {subfolder.name} (
-                                          {subfolderJobs.length} jobs)
-                                        </span>
-                                        {subfolder.description && (
-                                          <span className="subfolder-jobs-description">
-                                            {subfolder.description}
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                    <div className="subfolder-jobs-list">
-                                      {subfolderJobs.map((job, jobIndex) => (
-                                        <div
-                                          key={job.id}
-                                          className="ai-workflow-job"
-                                        >
-                                          <div className="job-header">
-                                            <span className="job-number">
-                                              {jobIndex + 1}
-                                            </span>
-                                            <span className="job-name">
-                                              {job.name}
-                                            </span>
-                                            <span className="job-type">
-                                              {job.type}
-                                            </span>
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                );
-                              }
-                            )}
-
-                            {/* Show jobs that don't belong to any subfolder */}
-                            {(() => {
-                              const orphanJobs = parsedWorkflow.jobs.filter(
-                                (job) =>
-                                  !parsedWorkflow.subfolders.some(
-                                    (subfolder) =>
-                                      subfolder.name === job.subfolder
-                                  )
-                              );
-
-                              if (orphanJobs.length === 0) return null;
-
-                              return (
-                                <div className="subfolder-jobs">
-                                  <div className="subfolder-jobs-header">
-                                    <span className="subfolder-jobs-title">
-                                      📁 Main Folder ({orphanJobs.length} jobs)
-                                    </span>
-                                  </div>
-                                  <div className="subfolder-jobs-list">
-                                    {orphanJobs.map((job, jobIndex) => (
-                                      <div
-                                        key={job.id}
-                                        className="ai-workflow-job"
-                                      >
-                                        <div className="job-header">
-                                          <span className="job-number">
-                                            {jobIndex + 1}
-                                          </span>
-                                          <span className="job-name">
-                                            {job.name}
-                                          </span>
-                                          <span className="job-type">
-                                            {job.type}
-                                          </span>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              );
-                            })()}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-              </div>
-            )}
-          </div>
-
-          {narrative && (
-            <div className="narrative-display">
-              <div dangerouslySetInnerHTML={{ __html: marked(narrative) }} />
-            </div>
-          )}
-
-          {talkTrack && (
-            <div className="talk-track-display">
-              <div dangerouslySetInnerHTML={{ __html: marked(talkTrack) }} />
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Deployment Configuration Modal */}
-      {showDeployModal && (
-        <div className="modal">
-          <div className="modal-content">
-            <h3>Deployment Configuration</h3>
-            <div className="form-group">
-              <label>Environment:</label>
-              <select
-                value={deployConfig.environment}
-                onChange={(e) =>
-                  setDeployConfig((prev) => ({
-                    ...prev,
-                    environment: e.target.value,
-                    // Update Control-M server based on environment
-                    controlm_server: e.target.value.startsWith("saas")
-                      ? "IN01"
-                      : e.target.value === "vse_dev"
-                      ? "DEV"
-                      : e.target.value === "vse_qa"
-                      ? "QA"
-                      : e.target.value === "vse_prod"
-                      ? "PROD"
-                      : "IN01",
-                  }))
-                }
-              >
-                <option value="saas_dev">SaaS Dev</option>
-                <option value="saas_preprod">SaaS Preprod</option>
-                <option value="saas_prod">SaaS Prod</option>
-                <option value="vse_dev">VSE Dev</option>
-                <option value="vse_qa">VSE QA</option>
-                <option value="vse_prod">VSE Prod</option>
-              </select>
-            </div>
-            <div className="form-group">
-              <label>Control-M Server:</label>
-              <select
-                value={deployConfig.controlm_server}
-                onChange={(e) =>
-                  setDeployConfig((prev) => ({
-                    ...prev,
-                    controlm_server: e.target.value,
-                  }))
-                }
-              >
-                <option value="IN01">IN01</option>
-                <option value="DEV">DEV</option>
-                <option value="QA">QA</option>
-                <option value="PROD">PROD</option>
-              </select>
-            </div>
-            <div className="form-group">
-              <label>User Code:</label>
-              <input
-                type="text"
-                value={deployConfig.userCode}
-                onChange={(e) =>
-                  setDeployConfig((prev) => ({
-                    ...prev,
-                    userCode: e.target.value,
-                  }))
-                }
-                placeholder="Enter user code (LBA)"
-              />
-            </div>
-            <div className="form-group">
-              <label>Folder Name:</label>
-              <input
-                type="text"
-                value={deployConfig.folderName}
-                onChange={(e) =>
-                  setDeployConfig((prev) => ({
-                    ...prev,
-                    folderName: e.target.value,
-                  }))
-                }
-                placeholder="Enter folder name (DEMGEN_VB)"
-              />
-            </div>
-            <div className="form-group">
-              <label>Application:</label>
-              <input
-                type="text"
-                value={deployConfig.application}
-                onChange={(e) =>
-                  setDeployConfig((prev) => ({
-                    ...prev,
-                    application: e.target.value,
-                  }))
-                }
-                placeholder="Enter application name"
-              />
-            </div>
-            <div className="form-group">
-              <label>Sub-Application:</label>
-              <input
-                type="text"
-                value={deployConfig.subApplication}
-                onChange={(e) =>
-                  setDeployConfig((prev) => ({
-                    ...prev,
-                    subApplication: e.target.value,
-                  }))
-                }
-                placeholder="Enter sub-application name"
-              />
-            </div>
-            <div className="modal-buttons">
-              <button onClick={() => setShowDeployModal(false)}>Cancel</button>
-              <button onClick={handlePersonalizedDeployConfirm}>Deploy</button>
-            </div>
-          </div>
-        </div>
+      {selectedView === null && (
+        <ViewSelector
+          selectedView={selectedView}
+          onViewChange={setSelectedView}
+        />
       )}
-
-      {/* Template Save Modal */}
-      {showTemplateModal && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <h2>Save as Template</h2>
-            <div className="modal-form">
-              <div className="form-group">
-                <label>Template Name:</label>
-                <input
-                  type="text"
-                  value={templateName}
-                  onChange={(e) => setTemplateName(e.target.value)}
-                  placeholder="Enter template name"
-                />
-              </div>
-              <div className="form-group">
-                <label>Category:</label>
-                <select
-                  value={templateCategory}
-                  onChange={(e) => setTemplateCategory(e.target.value)}
-                >
-                  <option value="">Select a category</option>
-                  {templateCategories.map((category) => (
-                    <option key={category} value={category}>
-                      {category}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="modal-actions">
-                <button onClick={() => setShowTemplateModal(false)}>
-                  Cancel
-                </button>
-                <button onClick={handleSaveAsTemplate}>Save Template</button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {selectedView === "ai" && (
+        <AIWorkflowView
+          useCase={useCase}
+          setUseCase={setUseCase}
+          userCode={userCode}
+          setUserCode={setUserCode}
+          aiResponseContent={aiResponseContent}
+          isGeneratingAIWorkflow={isGeneratingAIWorkflow}
+          isDeployingAIWorkflow={isDeployingAIWorkflow}
+          aiWorkflowData={aiWorkflowData}
+          deployConfig={deployConfig}
+          setDeployConfig={setDeployConfig}
+          showDeployModal={showDeployModal}
+          setShowDeployModal={setShowDeployModal}
+          generateAIWorkflow={generateAIWorkflow}
+          regenerateAIWorkflow={regenerateAIWorkflow}
+          deployAIWorkflow={deployAIWorkflow}
+          handlePersonalizedDeployConfirm={handlePersonalizedDeployConfirm}
+          status={status}
+          parseAIWorkflow={parseAIWorkflow}
+        />
       )}
-
-      {/* Confirmation Modal */}
-      {showConfirmModal && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <h2>Template Already Exists</h2>
-            <p>
-              A template with this name and category already exists. What would
-              you like to do?
-            </p>
-            <div className="modal-actions">
-              <button
-                onClick={() => {
-                  console.log("Update button clicked");
-                  handleConfirmAction("update");
-                }}
-              >
-                Update Existing Template
-              </button>
-              <button
-                onClick={() => {
-                  console.log("New button clicked");
-                  handleConfirmAction("new");
-                }}
-              >
-                Create New Template
-              </button>
-              <button
-                onClick={() => {
-                  console.log("Cancel button clicked");
-                  setShowConfirmModal(false);
-                  setConfirmAction(null);
-                  setExistingTemplateId(null);
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Use Template Modal */}
-      {showUseTemplateModal && (
-        <div className="modal-overlay">
-          <div className="modal-content template-modal">
-            <h3>Select a Template</h3>
-            <div className="template-categories">
-              <button
-                className={`category-button ${
-                  !selectedCategory ? "active" : ""
-                }`}
-                onClick={() => setSelectedCategory("")}
-              >
-                All Categories
-              </button>
-              {templateCategories.map((category) => (
-                <button
-                  key={category}
-                  className={`category-button ${
-                    selectedCategory === category ? "active" : ""
-                  }`}
-                  onClick={() => setSelectedCategory(category)}
-                >
-                  {category}
-                </button>
-              ))}
-            </div>
-            <div className="template-list">
-              {filteredTemplates.length > 0 ? (
-                filteredTemplates.map((template) => (
-                  <div key={template.templateId} className="template-card">
-                    <h4>{template.name}</h4>
-                    <p className="template-category">{template.category}</p>
-                    <p className="template-description">
-                      {template.description}
-                    </p>
-                    <div className="template-technologies">
-                      <strong>Technologies:</strong>
-                      <div className="tech-tags">
-                        {template.technologies.map((tech) => (
-                          <span key={tech} className="tech-tag">
-                            {tech}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                    <button
-                      className="action-button"
-                      onClick={() => handleLoadTemplate(template)}
-                    >
-                      Use This Template
-                    </button>
-                    <button
-                      className="action-button placeholder-button"
-                      onClick={() => handleDeleteTemplate(template.templateId)}
-                    >
-                      Delete Template
-                    </button>
-                  </div>
-                ))
-              ) : (
-                <p className="no-templates">
-                  No templates found in this category
-                </p>
-              )}
-            </div>
-            <div className="modal-actions">
-              <button
-                className="action-button"
-                onClick={() => setShowUseTemplateModal(false)}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* GitHub Upload Modal */}
-      {showGithubModal && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <h2>Upload to GitHub</h2>
-            <div className="modal-form">
-              <div className="form-group">
-                <label>User Code:</label>
-                <input
-                  type="text"
-                  value={githubConfig.userCode}
-                  onChange={(e) =>
-                    setGithubConfig((prev) => ({
-                      ...prev,
-                      userCode: e.target.value,
-                    }))
-                  }
-                  placeholder="Enter your user code"
-                />
-              </div>
-              <div className="form-group">
-                <label>Repository:</label>
-                <input
-                  type="text"
-                  value={githubConfig.repository}
-                  onChange={(e) =>
-                    setGithubConfig((prev) => ({
-                      ...prev,
-                      repository: e.target.value,
-                    }))
-                  }
-                  placeholder="owner/repository"
-                />
-              </div>
-              <div className="form-group">
-                <label>Branch:</label>
-                <input
-                  type="text"
-                  value={githubConfig.branch}
-                  onChange={(e) =>
-                    setGithubConfig((prev) => ({
-                      ...prev,
-                      branch: e.target.value,
-                    }))
-                  }
-                  placeholder="main"
-                />
-              </div>
-              <div className="form-group">
-                <label>Path:</label>
-                <input
-                  type="text"
-                  value={githubConfig.path}
-                  onChange={(e) =>
-                    setGithubConfig((prev) => ({
-                      ...prev,
-                      path: e.target.value,
-                    }))
-                  }
-                  placeholder="path/to/workflow.json"
-                />
-              </div>
-              <div className="form-group">
-                <label>Commit Message:</label>
-                <input
-                  type="text"
-                  value={githubConfig.commitMessage}
-                  onChange={(e) =>
-                    setGithubConfig((prev) => ({
-                      ...prev,
-                      commitMessage: e.target.value,
-                    }))
-                  }
-                  placeholder="Update workflow configuration"
-                />
-              </div>
-              <div className="modal-actions">
-                <button onClick={() => setShowGithubModal(false)}>
-                  Cancel
-                </button>
-                <button onClick={handleGithubUpload}>Upload</button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {selectedView === "manual" && (
+        <ManualWorkflowView
+          useCase={useCase}
+          setUseCase={setUseCase}
+          userCode={userCode}
+          setUserCode={setUserCode}
+          selectedTechnologies={selectedTechnologies}
+          setSelectedTechnologies={setSelectedTechnologies}
+          optimalOrder={optimalOrder}
+          setOptimalOrder={setOptimalOrder}
+          narrative={narrative}
+          setNarrative={setNarrative}
+          talkTrack={talkTrack}
+          setTalkTrack={setTalkTrack}
+          renamedTechnologies={renamedTechnologies}
+          setRenamedTechnologies={setRenamedTechnologies}
+          proposedWorkflow={proposedWorkflow}
+          setProposedWorkflow={setProposedWorkflow}
+          selectedTechCategory={selectedTechCategory}
+          setSelectedTechCategory={setSelectedTechCategory}
+          deployConfig={deployConfig}
+          setDeployConfig={setDeployConfig}
+          showDeployModal={showDeployModal}
+          setShowDeployModal={setShowDeployModal}
+          showTemplateModal={showTemplateModal}
+          setShowTemplateModal={setShowTemplateModal}
+          showUseTemplateModal={showUseTemplateModal}
+          setShowUseTemplateModal={setShowUseTemplateModal}
+          showGithubModal={showGithubModal}
+          setShowGithubModal={setShowGithubModal}
+          templates={templates}
+          setTemplates={setTemplates}
+          selectedCategory={selectedCategory}
+          setSelectedCategory={setSelectedCategory}
+          templateName={templateName}
+          setTemplateName={setTemplateName}
+          templateCategory={templateCategory}
+          setTemplateCategory={setTemplateCategory}
+          showConfirmModal={showConfirmModal}
+          setShowConfirmModal={setShowConfirmModal}
+          existingTemplateId={existingTemplateId}
+          setExistingTemplateId={setExistingTemplateId}
+          confirmAction={confirmAction}
+          setConfirmAction={setConfirmAction}
+          githubConfig={githubConfig}
+          setGithubConfig={setGithubConfig}
+          documentationFile={documentationFile}
+          setDocumentationFile={setDocumentationFile}
+          analysisResult={analysisResult}
+          setAnalysisResult={setAnalysisResult}
+          fileInputRef={fileInputRef}
+          status={status}
+          setStatus={setStatus}
+          workflowType={workflowType}
+          showInstructions={showInstructions}
+          setShowInstructions={setShowInstructions}
+          toggleTechnologyInWorkflow={toggleTechnologyInWorkflow}
+          generateOptimalOrder={generateOptimalOrder}
+          generateNarrative={generateNarrative}
+          generateTalkTrack={generateTalkTrack}
+          generateProposedWorkflow={generateProposedWorkflow}
+          handlePersonalizeUseCase={handlePersonalizeUseCase}
+          handleFileUpload={handleFileUpload}
+          handleDocumentationUpload={handleDocumentationUpload}
+          analyzeDocumentation={analyzeDocumentation}
+          handleDeployPersonalizedWorkflow={handleDeployPersonalizedWorkflow}
+          handlePersonalizedDeployConfirm={handlePersonalizedDeployConfirm}
+          handleDownloadWorkflow={handleDownloadWorkflow}
+          handleSaveAsTemplate={handleSaveAsTemplate}
+          saveTemplate={saveTemplate}
+          handleConfirmAction={handleConfirmAction}
+          handleUseTemplate={handleUseTemplate}
+          handleLoadTemplate={handleLoadTemplate}
+          handleDeleteTemplate={handleDeleteTemplate}
+          handleGithubUpload={handleGithubUpload}
+          handleWorkflowTypeChange={handleWorkflowTypeChange}
+          renderInstructions={renderInstructions}
+          renderWorkflowItem={renderWorkflowItem}
+          templateCategories={templateCategories}
+        />
       )}
     </div>
   );

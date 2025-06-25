@@ -104,7 +104,7 @@ def generate_workflow():
     jobs_data = data['jobs']
     subfolders_data = data.get('subfolders', [])
     environment = data.get('environment', 'saas_dev')
-    folder_name = data.get('folder_name', 'LBA_DEMGEN_VB')
+    folder_name = data.get('folder_name', 'LBA_demo-genai')
     user_code = data.get('user_code', 'LBA')
 
     # Validate environment
@@ -126,8 +126,8 @@ def generate_workflow():
 
     # Format folder and application names with user code
     formatted_folder_name = f"{user_code}-{folder_name}"
-    formatted_application = f"{user_code}-DMO-GEN"
-    formatted_sub_application = f"{user_code}-TEST-APP"
+    formatted_application = f"{user_code}-demo-genai"
+    formatted_sub_application = f"{user_code}-demo-genai"
 
     try:
         # Create environment connection
@@ -703,9 +703,9 @@ def create_workflow():
         ordered_workflow = data.get("optimal_order") or technologies
         environment = data.get('environment', 'saas_dev')  # Default to saas_dev if not specified
         user_code = data.get('user_code', 'LBA')  # Default to LBA if not specified
-        folder_name = data.get('folder_name', 'DEMGEN_VB')
-        application = data.get('application', 'DMO-GEN')
-        sub_application = data.get('sub_application', 'TEST-APP')
+        folder_name = data.get('folder_name', 'demo-genai')
+        application = data.get('application', 'demo-genai')
+        sub_application = data.get('sub_application', 'demo-genai')
         controlm_server = data.get('controlm_server', 'IN01')
 
         if not technologies or not use_case or not renamed_technologies:
@@ -845,9 +845,9 @@ def deploy_personalized_workflow():
         # Extract workflow configuration from request
         environment = data.get('environment', 'saas_dev')
         user_code = data.get('user_code', 'LBA')
-        folder_name = data.get('folder_name', 'DEMGEN_VB')
-        application = data.get('application', 'DMO-GEN')
-        sub_application = data.get('sub_application', 'TEST-APP')
+        folder_name = data.get('folder_name', 'demo-genai')
+        application = data.get('application', 'demo-genai')
+        sub_application = data.get('sub_application', 'demo-genai')
         technologies = data.get('technologies', [])
         renamed_technologies = data.get('renamed_technologies', {})
         ordered_workflow = data.get('optimal_order') or technologies
@@ -976,7 +976,7 @@ def download_workflow():
 
     requested_jobs = data['jobs']
     environment = data.get('environment', 'saas_dev')
-    folder_name = data.get('folder_name', 'LBA_DEMGEN_VB')
+    folder_name = data.get('folder_name', 'LBA_demo-genai')
     user_code = data.get('user_code', 'LBA')
 
     # Validate environment
@@ -997,9 +997,9 @@ def download_workflow():
         return jsonify({"error": "Invalid environment configuration"}), 400
 
     # Format folder and application names with user code
-    formatted_folder_name = f"{user_code}_DEMGEN_VB"
-    formatted_application = f"{user_code}-DMO-GEN"
-    formatted_sub_application = f"{user_code}-TEST-APP"
+    formatted_folder_name = f"{user_code}_demo-genai"
+    formatted_application = f"{user_code}-demo-genai"
+    formatted_sub_application = f"{user_code}-demo-genai"
 
     # ENV & defaults
     my_env = Environment.create_saas(
@@ -1156,9 +1156,9 @@ def save_template():
             "renamedTechnologies": data.get('renamedTechnologies', {}),
             "environment": data.get('environment', 'saas_dev'),
             "userCode": data.get('userCode', 'LBA'),
-            "folderName": data.get('folderName', 'DEMGEN_VB'),
-            "application": data.get('application', 'DMO-GEN'),
-            "subApplication": data.get('subApplication', 'TEST-APP')
+            "folderName": data.get('folderName', 'demo-genai'),
+            "application": data.get('application', 'demo-genai'),
+            "subApplication": data.get('subApplication', 'demo-genai')
         }
 
         # Save template to a JSON file
@@ -1682,7 +1682,7 @@ def ai_generated_workflow():
 
     # Common workflow creation logic (same as generate_workflow)
     environment = data.get('environment', 'saas_dev')
-    folder_name = data.get('folder_name', 'LBA_DEMGEN_VB')
+    folder_name = data.get('folder_name', 'LBA_demo-genai')
     user_code = data.get('user_code', 'LBA')
 
     # Validate environment
@@ -1704,8 +1704,8 @@ def ai_generated_workflow():
 
     # Format folder and application names with user code
     formatted_folder_name = f"{user_code}-{folder_name}"
-    formatted_application = f"{user_code}-DMO-GEN"
-    formatted_sub_application = f"{user_code}-TEST-APP"
+    formatted_application = f"{user_code}-demo-genai"
+    formatted_sub_application = f"{user_code}-demo-genai"
 
     try:
         # Create environment connection
@@ -2109,8 +2109,8 @@ def deploy_ai_workflow():
 
     # Format folder and application names with user code
     formatted_folder_name = f"{user_code}-{folder_name}"
-    formatted_application = f"{user_code}-DMO-GEN"
-    formatted_sub_application = f"{user_code}-TEST-APP"
+    formatted_application = f"{user_code}-demo-genai"
+    formatted_sub_application = f"{user_code}-demo-genai"
 
     try:
         # Create environment connection
