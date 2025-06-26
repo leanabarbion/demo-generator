@@ -14,10 +14,10 @@ function App() {
   const [userCode, setUserCode] = useState("");
   const [status, setStatus] = useState(null);
   const [optimalOrder, setOptimalOrder] = useState(null);
+  const [complexWorkflow, setComplexWorkflow] = useState(null);
   const [narrative, setNarrative] = useState("");
   const [talkTrack, setTalkTrack] = useState("");
   const [proposedWorkflow, setProposedWorkflow] = useState(null);
-  const [renamedTechnologies, setRenamedTechnologies] = useState({});
   const [selectedTechnologies, setSelectedTechnologies] = useState([]);
   const [showDeployModal, setShowDeployModal] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -53,7 +53,26 @@ function App() {
   const [aiWorkflowData, setAiWorkflowData] = useState(null);
   const [isGeneratingAIWorkflow, setIsGeneratingAIWorkflow] = useState(false);
   const [isDeployingAIWorkflow, setIsDeployingAIWorkflow] = useState(false);
+  const [documentationSkipped, setDocumentationSkipped] = useState(false);
   const [selectedView, setSelectedView] = useState(null); // 'ai' or 'manual'
+  const [manualWorkflowData, setManualWorkflowData] = useState(null);
+
+  // Debug logging for complex workflow state
+  useEffect(() => {
+    console.log("State Debug:", {
+      selectedTechnologies: selectedTechnologies.length,
+      complexWorkflow: !!complexWorkflow,
+      optimalOrder: !!optimalOrder,
+      proposedWorkflow: !!proposedWorkflow,
+      useCase: !!useCase,
+    });
+  }, [
+    selectedTechnologies,
+    complexWorkflow,
+    optimalOrder,
+    proposedWorkflow,
+    useCase,
+  ]);
 
   const templateCategories = [
     "Banking, Financial Services, Insurance",
@@ -69,22 +88,27 @@ function App() {
       if (prev.includes(techName)) {
         return prev.filter((tech) => tech !== techName);
       } else {
+        // If user manually adds a technology, clear the proposed workflow
+        // to indicate they want to start fresh from manual selection
+        if (proposedWorkflow) {
+          setProposedWorkflow(null);
+        }
         return [...prev, techName];
       }
     });
   };
 
-  const generateOptimalOrder = async () => {
+  const generateManualWorkflow = async () => {
     if (selectedTechnologies.length === 0 || !useCase.trim()) {
       setStatus("Select technologies and provide a use case first.");
-      setTimeout(() => setStatus(null), 3000);
+      setTimeout(() => setStatus(null), 30000);
       return;
     }
 
     try {
-      setStatus("Generating Logical order...");
+      setStatus("Generating manual workflow...");
       const response = await fetch(
-        "http://localhost:5000/generate_optimal_order",
+        "http://localhost:5000/manualworkflow/generate_manual_workflow",
         {
           method: "POST",
           headers: {
@@ -93,29 +117,52 @@ function App() {
           body: JSON.stringify({
             technologies: selectedTechnologies,
             use_case: useCase,
+            user_code: userCode,
           }),
         }
       );
 
       if (!response.ok) {
-        throw new Error("Failed to generate Logical order");
+        const errorData = await response.json();
+        console.error("Backend error:", errorData);
+        throw new Error(
+          errorData.error || "Failed to generate manual workflow"
+        );
       }
 
       const data = await response.json();
-      setOptimalOrder(data.optimal_order);
-      setStatus("Logical order generated successfully!");
-      setTimeout(() => setStatus(null), 3000);
+
+      console.log("generateManualWorkflow response:", data);
+      console.log("Response keys:", Object.keys(data));
+
+      // Set the optimal order from the response
+      if (data.optimal_order) {
+        setOptimalOrder(data.optimal_order);
+        setStatus("Manual workflow generated successfully!");
+      } else {
+        setOptimalOrder(selectedTechnologies);
+        setStatus("Manual workflow generated with default order!");
+      }
+
+      // Set the complex workflow with the workflow data
+      if (data.workflow) {
+        setComplexWorkflow(data.workflow);
+      }
+
+      setManualWorkflowData(data);
+
+      setTimeout(() => setStatus(null), 30000);
     } catch (error) {
-      console.error("Error generating Logical order:", error);
-      setStatus("Failed to generate Logical order. Please try again.");
-      setTimeout(() => setStatus(null), 3000);
+      console.error("Error generating manual workflow:", error);
+      setStatus("Failed to generate manual workflow. Please try again.");
+      setTimeout(() => setStatus(null), 30000);
     }
   };
 
   const generateNarrative = async () => {
     if (selectedTechnologies.length === 0 || !useCase.trim()) {
       setStatus("Provide technologies and use case first.");
-      setTimeout(() => setStatus(null), 3000);
+      setTimeout(() => setStatus(null), 30000);
       return;
     }
 
@@ -123,17 +170,20 @@ function App() {
     setNarrative("");
 
     try {
-      const response = await fetch("http://localhost:5000/generate-narrative", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          technologies: selectedTechnologies,
-          use_case: useCase,
-          optimal_order: optimalOrder || selectedTechnologies,
-        }),
-      });
+      const response = await fetch(
+        "http://localhost:5000/documentation/generate-narrative",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            technologies: selectedTechnologies,
+            use_case: useCase,
+            optimal_order: optimalOrder || selectedTechnologies,
+          }),
+        }
+      );
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -148,17 +198,18 @@ function App() {
       }
 
       setStatus("Narrative generated!");
+      setDocumentationSkipped(false);
     } catch (error) {
       console.error("Narrative Generation Error:", error);
       setStatus("Failed to generate narrative.");
     }
-    setTimeout(() => setStatus(null), 3000);
+    setTimeout(() => setStatus(null), 30000);
   };
 
   const generateTalkTrack = async () => {
     if (selectedTechnologies.length === 0 || !useCase.trim()) {
       setStatus("Provide technologies and use case first.");
-      setTimeout(() => setStatus(null), 3000);
+      setTimeout(() => setStatus(null), 30000);
       return;
     }
 
@@ -166,17 +217,20 @@ function App() {
     setTalkTrack("");
 
     try {
-      const response = await fetch("http://localhost:5000/generate-talktrack", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          technologies: selectedTechnologies,
-          use_case: useCase,
-          optimal_order: optimalOrder || selectedTechnologies,
-        }),
-      });
+      const response = await fetch(
+        "http://localhost:5000/documentation/generate-talktrack",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            technologies: selectedTechnologies,
+            use_case: useCase,
+            optimal_order: optimalOrder || selectedTechnologies,
+          }),
+        }
+      );
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -191,11 +245,12 @@ function App() {
       }
 
       setStatus("Talk track generated!");
+      setDocumentationSkipped(false);
     } catch (error) {
       console.error("Talk Track Generation Error:", error);
       setStatus("Failed to generate talk track.");
     }
-    setTimeout(() => setStatus(null), 3000);
+    setTimeout(() => setStatus(null), 30000);
   };
 
   const handleDeployConfigChange = (field, value) => {
@@ -205,134 +260,62 @@ function App() {
     }));
   };
 
-  const handleDeployWorkflow = async () => {
-    console.log("Deploy workflow button clicked");
-    console.log("Current state:", {
-      selectedTechnologies,
-      useCase,
-      deployConfig,
-    });
-
-    if (!selectedTechnologies.length || !useCase) {
-      console.log("Missing prerequisites:", {
-        hasTechnologies: selectedTechnologies.length > 0,
-        hasUseCase: !!useCase,
-      });
-      alert("Please select technologies and enter a use case first.");
-      return;
-    }
-
+  const handleDeployManualWorkflow = async () => {
     try {
-      console.log("Starting workflow deployment with config:", deployConfig);
+      setShowDeployModal(false);
       setStatus("Deploying workflow...");
 
-      const requestBody = {
-        jobs: selectedTechnologies,
-        environment: deployConfig.environment,
-        folder_name: deployConfig.folderName,
-        user_code: userCode,
-      };
-
-      console.log("Sending deployment request with body:", requestBody);
-
-      const response = await fetch("http://localhost:5000/generate_workflow", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      console.log("Received response:", response.status);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error("Deployment failed:", errorData);
-        throw new Error(errorData.error || "Failed to deploy workflow");
+      // Use the output from generateManualWorkflow
+      if (!optimalOrder || !selectedTechnologies.length) {
+        throw new Error(
+          "No workflow available for deployment. Please generate a workflow first."
+        );
       }
 
-      const data = await response.json();
-      console.log("Deployment successful:", data);
-      setStatus("Workflow deployed successfully!");
-      setTimeout(() => setStatus(""), 3000);
-    } catch (error) {
-      console.error("Deployment error:", error);
-      setStatus(`Error: ${error.message}`);
-      setTimeout(() => setStatus(""), 3000);
-    }
-  };
+      // Prepare the payload
+      const payload = {
+        environment: deployConfig.environment,
+        user_code: userCode,
+        folder_name: deployConfig.folderName,
+        application: deployConfig.application,
+        sub_application: deployConfig.subApplication,
+        technologies: selectedTechnologies,
+        optimal_order: optimalOrder,
+        workflow: complexWorkflow, // Include the complex workflow structure
+        sanitized_folder_name: null,
+        sanitized_job_names: null,
+      };
 
-  const handleDeployPersonalizedWorkflow = () => {
-    console.log("Deploy button clicked");
-    console.log("Current state:", {
-      selectedTechnologies,
-      useCase,
-      renamedTechnologies,
-      workflow,
-    });
+      // If you store sanitized names in state, add them here
+      if (manualWorkflowData && manualWorkflowData.sanitized_folder_name) {
+        payload.sanitized_folder_name =
+          manualWorkflowData.sanitized_folder_name;
+      }
+      if (manualWorkflowData && manualWorkflowData.sanitized_job_names) {
+        payload.sanitized_job_names = manualWorkflowData.sanitized_job_names;
+      }
 
-    if (!selectedTechnologies.length || !useCase) {
-      console.log("Missing prerequisites:", {
-        hasTechnologies: selectedTechnologies.length > 0,
-        hasUseCase: !!useCase,
-      });
-      alert("Please select technologies and enter a use case first.");
-      return;
-    }
-    if (!renamedTechnologies) {
-      console.log("Workflow not personalized");
-      alert("Please personalize the workflow names first.");
-      return;
-    }
-    console.log("Opening deployment modal");
-    setShowDeployModal(true);
-  };
-
-  const handlePersonalizedDeployConfirm = async () => {
-    try {
-      // Close modal immediately when deploy is clicked
-      setShowDeployModal(false);
-
-      console.log("Starting deployment with config:", deployConfig);
-      setStatus("Deploying workflow...");
-
-      // Deploy the workflow directly
-      const deployResponse = await fetch(
-        "http://localhost:5000/deploy_personalized_workflow",
+      const response = await fetch(
+        "http://localhost:5000/manualworkflow/deploy_manual_workflow",
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            technologies: selectedTechnologies,
-            use_case: useCase,
-            renamed_technologies: renamedTechnologies,
-            optimal_order: optimalOrder || selectedTechnologies,
-            environment: deployConfig.environment,
-            user_code: userCode,
-            folder_name: deployConfig.folderName,
-            application: deployConfig.application,
-            sub_application: deployConfig.subApplication,
-            controlm_server: deployConfig.controlm_server,
-          }),
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
         }
       );
 
-      if (!deployResponse.ok) {
-        const errorData = await deployResponse.json();
+      if (!response.ok) {
+        const errorData = await response.json();
         throw new Error(errorData.error || "Failed to deploy workflow");
       }
 
-      const deployData = await deployResponse.json();
-      console.log("Workflow deployed successfully:", deployData);
-
+      const deployData = await response.json();
       setStatus("Workflow deployed successfully!");
-      setTimeout(() => setStatus(""), 3000);
+      setTimeout(() => setStatus(""), 30000);
     } catch (error) {
       console.error("Deployment error:", error);
       setStatus(`Error: ${error.message}`);
-      setTimeout(() => setStatus(""), 3000);
+      setTimeout(() => setStatus(""), 30000);
     }
   };
 
@@ -344,18 +327,21 @@ function App() {
 
     try {
       setStatus("Preparing workflow download...");
-      const response = await fetch("http://localhost:5000/download_workflow", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          jobs: selectedTechnologies,
-          environment: deployConfig.environment,
-          folder_name: deployConfig.folderName,
-          user_code: userCode,
-        }),
-      });
+      const response = await fetch(
+        "http://localhost:5000/importexport/download_workflow",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            jobs: selectedTechnologies,
+            environment: deployConfig.environment,
+            folder_name: deployConfig.folderName,
+            user_code: userCode,
+          }),
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -378,11 +364,11 @@ function App() {
       document.body.removeChild(a);
 
       setStatus("Workflow downloaded successfully!");
-      setTimeout(() => setStatus(""), 3000);
+      setTimeout(() => setStatus(""), 30000);
     } catch (error) {
       console.error("Download error:", error);
       setStatus(`Error: ${error.message}`);
-      setTimeout(() => setStatus(""), 3000);
+      setTimeout(() => setStatus(""), 30000);
     }
   };
 
@@ -398,13 +384,16 @@ function App() {
     setOptimalOrder(null); // Clear any existing Logical order
 
     try {
-      const response = await fetch("http://localhost:5000/proposed_workflow", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ use_case: useCase }),
-      });
+      const response = await fetch(
+        "http://localhost:5000/manualworkflow/proposed_workflow",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ use_case: useCase }),
+        }
+      );
 
       if (!response.ok)
         throw new Error("Failed to generate proposed workflow.");
@@ -422,18 +411,23 @@ function App() {
 
       try {
         const data = JSON.parse(fullResponse);
-        if (data.technologies && data.workflow_order) {
-          // Update both the workflow and Logical order
+        if (data.technologies) {
+          // Update the selected technologies with the suggested ones
           setSelectedTechnologies(data.technologies);
-          setOptimalOrder(data.workflow_order);
+          // Set the optimal order to the same as suggested technologies (order will be optimized later in generate_manual_workflow)
+          setOptimalOrder(data.technologies);
           setProposedWorkflow(data);
 
           // Add a small delay to ensure the UI updates smoothly
           setTimeout(() => {
-            setStatus("Technologies and workflow order generated!");
+            setStatus(
+              "Technologies suggested! You can modify the selection and generate the workflow."
+            );
           }, 100);
         } else {
-          throw new Error("Invalid response format");
+          throw new Error(
+            "Invalid response format - missing technologies array"
+          );
         }
       } catch (parseError) {
         console.error("Error parsing response:", parseError);
@@ -443,47 +437,7 @@ function App() {
       console.error("Proposed Workflow Generation Error:", error);
       setStatus("Failed to generate proposed workflow.");
     }
-    setTimeout(() => setStatus(null), 3000);
-  };
-
-  const handlePersonalizeUseCase = async () => {
-    if (!selectedTechnologies.length || !useCase) {
-      alert("Please select technologies and enter a use case first.");
-      return;
-    }
-
-    try {
-      setStatus("Personalizing workflow names to match use case...");
-      const response = await fetch(
-        "http://localhost:5000/rename_technologies",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            technologies: selectedTechnologies,
-            use_case: useCase,
-            optimal_order: optimalOrder,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to rename technologies");
-      }
-
-      const data = await response.json();
-      setRenamedTechnologies(data.renamed_technologies);
-      setStatus(
-        "Workflow names have been personalized to match your use case!"
-      );
-      setTimeout(() => setStatus(null), 3000);
-    } catch (error) {
-      console.error("Error renaming technologies:", error);
-      setStatus("Failed to personalize workflow names. Please try again.");
-      setTimeout(() => setStatus(null), 3000);
-    }
+    setTimeout(() => setStatus(null), 30000);
   };
 
   const handleFileUpload = async (event) => {
@@ -500,10 +454,13 @@ function App() {
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await fetch("http://localhost:5000/upload_workflow", {
-        method: "POST",
-        body: formData,
-      });
+      const response = await fetch(
+        "http://localhost:5000/importexport/upload_workflow",
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -516,11 +473,11 @@ function App() {
       setSelectedTechnologies(data.jobs);
 
       setStatus("Workflow uploaded successfully!");
-      setTimeout(() => setStatus(""), 3000);
+      setTimeout(() => setStatus(""), 30000);
     } catch (error) {
       console.error("Upload error:", error);
       setStatus(`Error: ${error.message}`);
-      setTimeout(() => setStatus(""), 3000);
+      setTimeout(() => setStatus(""), 30000);
     }
   };
 
@@ -549,7 +506,7 @@ function App() {
       formData.append("use_case", useCase);
 
       const response = await fetch(
-        "http://localhost:5000/analyze_documentation",
+        "http://localhost:5000/importexport/analyze_documentation",
         {
           method: "POST",
           body: formData,
@@ -574,15 +531,14 @@ function App() {
       console.error("Documentation Analysis Error:", error);
       setStatus(`Error: ${error.message}`);
     }
-    setTimeout(() => setStatus(null), 3000);
+    setTimeout(() => setStatus(null), 30000);
   };
 
   const renderWorkflowItem = (tech, index) => {
-    const displayName = renamedTechnologies[tech] || tech;
     return (
       <li key={tech} className="ordered-item">
         <span className="step-number">{index + 1}</span>
-        <span className="job-name">{displayName}</span>
+        <span className="job-name">{tech}</span>
       </li>
     );
   };
@@ -609,24 +565,18 @@ function App() {
               <li>
                 <span className="step-number">3</span>
                 <span className="step-text">
-                  Click "Generate Logical order" to determine the best execution
-                  sequence
+                  Click "Generate Workflow" to create the workflow with optimal
+                  execution sequence
                 </span>
               </li>
               <li>
                 <span className="step-number">4</span>
                 <span className="step-text">
-                  Personalize the workflow names to match your use case
-                </span>
-              </li>
-              <li>
-                <span className="step-number">5</span>
-                <span className="step-text">
                   Generate narrative and talk track for presentations
                 </span>
               </li>
               <li>
-                <span className="step-number">6</span>
+                <span className="step-number">5</span>
                 <span className="step-text">
                   Deploy your workflow, save as template, or upload to GitHub
                 </span>
@@ -705,7 +655,7 @@ function App() {
               <li>
                 <span className="step-number">5</span>
                 <span className="step-text">
-                  Generate Logical order, narrative, and talk track
+                  Generate Workflow, narrative, and talk track
                 </span>
               </li>
               <li>
@@ -743,9 +693,7 @@ function App() {
               </li>
               <li>
                 <span className="step-number">4</span>
-                <span className="step-text">
-                  Generate Logical order and personalize workflow names
-                </span>
+                <span className="step-text">Generate Workflow</span>
               </li>
               <li>
                 <span className="step-number">5</span>
@@ -794,7 +742,7 @@ function App() {
               <li>
                 <span className="step-number">5</span>
                 <span className="step-text">
-                  Generate Logical order, narrative, and talk track
+                  Generate Workflow, narrative, and talk track
                 </span>
               </li>
               <li>
@@ -846,7 +794,6 @@ function App() {
       optimalOrder,
       useCase,
       narrative,
-      renamedTechnologies,
       deployConfig,
     });
 
@@ -862,7 +809,7 @@ function App() {
     console.log("🔍 Checking for existing template...");
     try {
       const response = await fetch(
-        "http://localhost:5000/check_template_exists",
+        "http://localhost:5000/templates/check_template_exists",
         {
           method: "POST",
           headers: {
@@ -906,7 +853,6 @@ function App() {
       workflowOrder: optimalOrder,
       useCase: useCase,
       narrative: narrative,
-      renamedTechnologies: renamedTechnologies,
       environment: deployConfig.environment,
       userCode: userCode,
       folderName: deployConfig.folderName,
@@ -915,26 +861,28 @@ function App() {
     });
 
     try {
-      const response = await fetch("http://localhost:5000/save_template", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: templateName,
-          category: templateCategory,
-          technologies: selectedTechnologies,
-          workflowOrder: optimalOrder,
-          useCase: useCase,
-          narrative: narrative,
-          renamedTechnologies: renamedTechnologies,
-          environment: deployConfig.environment,
-          userCode: userCode,
-          folderName: deployConfig.folderName,
-          application: deployConfig.application,
-          subApplication: deployConfig.subApplication,
-        }),
-      });
+      const response = await fetch(
+        "http://localhost:5000/templates/save_template",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: templateName,
+            category: templateCategory,
+            technologies: selectedTechnologies,
+            workflowOrder: optimalOrder,
+            useCase: useCase,
+            narrative: narrative,
+            environment: deployConfig.environment,
+            userCode: userCode,
+            folderName: deployConfig.folderName,
+            application: deployConfig.application,
+            subApplication: deployConfig.subApplication,
+          }),
+        }
+      );
 
       if (response.ok) {
         const result = await response.json();
@@ -967,7 +915,6 @@ function App() {
       optimalOrder,
       useCase,
       narrative,
-      renamedTechnologies,
       deployConfig,
     });
 
@@ -982,7 +929,6 @@ function App() {
           workflowOrder: optimalOrder,
           useCase: useCase,
           narrative: narrative,
-          renamedTechnologies: renamedTechnologies,
           environment: deployConfig.environment,
           userCode: userCode,
           folderName: deployConfig.folderName,
@@ -996,27 +942,29 @@ function App() {
         setShowConfirmModal(false);
 
         // Update the existing template
-        const response = await fetch("http://localhost:5000/update_template", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            templateId: existingTemplateId,
-            name: templateName,
-            category: templateCategory,
-            technologies: selectedTechnologies,
-            workflowOrder: optimalOrder,
-            useCase: useCase,
-            narrative: narrative,
-            renamedTechnologies: renamedTechnologies,
-            environment: deployConfig.environment,
-            userCode: userCode,
-            folderName: deployConfig.folderName,
-            application: deployConfig.application,
-            subApplication: deployConfig.subApplication,
-          }),
-        });
+        const response = await fetch(
+          "http://localhost:5000/templates/update_template",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              templateId: existingTemplateId,
+              name: templateName,
+              category: templateCategory,
+              technologies: selectedTechnologies,
+              workflowOrder: optimalOrder,
+              useCase: useCase,
+              narrative: narrative,
+              environment: deployConfig.environment,
+              userCode: userCode,
+              folderName: deployConfig.folderName,
+              application: deployConfig.application,
+              subApplication: deployConfig.subApplication,
+            }),
+          }
+        );
 
         console.log("📝 Update response status:", response.status);
 
@@ -1057,7 +1005,9 @@ function App() {
   const handleUseTemplate = async () => {
     console.log("🔍 handleUseTemplate called - fetching templates");
     try {
-      const response = await fetch("http://localhost:5000/list_templates");
+      const response = await fetch(
+        "http://localhost:5000/templates/list_templates"
+      );
       if (!response.ok) {
         throw new Error("Failed to fetch templates");
       }
@@ -1077,7 +1027,6 @@ function App() {
     setOptimalOrder(template.workflowOrder);
     setUseCase(template.useCase);
     setNarrative(template.narrative);
-    setRenamedTechnologies(template.renamedTechnologies);
     setUserCode(template.userCode || "LBA");
     setDeployConfig({
       environment: template.environment || "saas_dev",
@@ -1091,17 +1040,21 @@ function App() {
     setTalkTrack("");
     setShowUseTemplateModal(false);
     setStatus("Template loaded successfully!");
+    setTimeout(() => setStatus(""), 30000);
   };
 
   const handleDeleteTemplate = async (templateId) => {
     try {
-      const response = await fetch("http://localhost:5000/delete_template", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ templateId }),
-      });
+      const response = await fetch(
+        "http://localhost:5000/templates/delete_template",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ templateId }),
+        }
+      );
 
       if (!response.ok) {
         throw new Error("Failed to delete template");
@@ -1112,9 +1065,11 @@ function App() {
         templates.filter((template) => template.templateId !== templateId)
       );
       setStatus("Template deleted successfully");
+      setTimeout(() => setStatus(""), 30000);
     } catch (error) {
       console.error("Error deleting template:", error);
       setStatus("Error deleting template: " + error.message);
+      setTimeout(() => setStatus(""), 30000);
     }
   };
 
@@ -1125,7 +1080,7 @@ function App() {
   const handleGithubUpload = async () => {
     if (!selectedTechnologies.length) {
       setStatus("Please select technologies first.");
-      setTimeout(() => setStatus(""), 3000);
+      setTimeout(() => setStatus(""), 30000);
       return;
     }
 
@@ -1134,7 +1089,7 @@ function App() {
 
       // First, create the workflow
       const createResponse = await fetch(
-        "http://localhost:5000/create_workflow",
+        "http://localhost:5000/manualworkflow/create_workflow",
         {
           method: "POST",
           headers: {
@@ -1143,7 +1098,6 @@ function App() {
           body: JSON.stringify({
             technologies: selectedTechnologies,
             use_case: useCase,
-            renamed_technologies: renamedTechnologies,
             optimal_order: optimalOrder || selectedTechnologies,
             environment: deployConfig.environment,
             user_code: userCode,
@@ -1162,7 +1116,7 @@ function App() {
 
       // Now upload to GitHub
       const githubResponse = await fetch(
-        "http://localhost:5000/upload-github",
+        "http://localhost:5000/importexport/upload-github",
         {
           method: "POST",
           headers: {
@@ -1183,18 +1137,18 @@ function App() {
       const githubData = await githubResponse.json();
       setStatus("Successfully uploaded to GitHub!");
       setShowGithubModal(false);
-      setTimeout(() => setStatus(""), 3000);
+      setTimeout(() => setStatus(""), 30000);
     } catch (error) {
       console.error("GitHub upload error:", error);
       setStatus(`Error: ${error.message}`);
-      setTimeout(() => setStatus(""), 3000);
+      setTimeout(() => setStatus(""), 30000);
     }
   };
 
   const generateAIWorkflow = async () => {
     if (!useCase.trim()) {
       setStatus("Please enter a use case first.");
-      setTimeout(() => setStatus(""), 3000);
+      setTimeout(() => setStatus(""), 30000);
       return;
     }
 
@@ -1202,15 +1156,18 @@ function App() {
       setIsGeneratingAIWorkflow(true);
       setStatus("🤖 Generating AI workflow...");
 
-      const response = await fetch("http://localhost:5000/ai_prompt_workflow", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          use_case: useCase,
-        }),
-      });
+      const response = await fetch(
+        "http://localhost:5000/aiworkflow/ai_prompt_workflow",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            use_case: useCase,
+          }),
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -1222,11 +1179,11 @@ function App() {
       setStatus(
         "✅ AI workflow generated successfully! Review and deploy when ready."
       );
-      setTimeout(() => setStatus(""), 5000);
+      setTimeout(() => setStatus(""), 30000);
     } catch (error) {
       console.error("AI workflow generation error:", error);
       setStatus(`❌ Error: ${error.message}`);
-      setTimeout(() => setStatus(""), 3000);
+      setTimeout(() => setStatus(""), 30000);
     } finally {
       setIsGeneratingAIWorkflow(false);
     }
@@ -1235,7 +1192,7 @@ function App() {
   const regenerateAIWorkflow = async () => {
     if (!useCase.trim()) {
       setStatus("Please enter a use case first.");
-      setTimeout(() => setStatus(""), 3000);
+      setTimeout(() => setStatus(""), 30000);
       return;
     }
 
@@ -1246,15 +1203,18 @@ function App() {
       // Clear the deployment status when regenerating
       setAiWorkflowData(null);
 
-      const response = await fetch("http://localhost:5000/ai_prompt_workflow", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          use_case: useCase,
-        }),
-      });
+      const response = await fetch(
+        "http://localhost:5000/aiworkflow/ai_prompt_workflow",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            use_case: useCase,
+          }),
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -1264,11 +1224,11 @@ function App() {
       const data = await response.json();
       setAiResponseContent(data.response_content);
       setStatus("✅ AI workflow regenerated successfully!");
-      setTimeout(() => setStatus(""), 3000);
+      setTimeout(() => setStatus(""), 30000);
     } catch (error) {
       console.error("AI workflow regeneration error:", error);
       setStatus(`❌ Error: ${error.message}`);
-      setTimeout(() => setStatus(""), 3000);
+      setTimeout(() => setStatus(""), 30000);
     } finally {
       setIsGeneratingAIWorkflow(false);
     }
@@ -1277,7 +1237,7 @@ function App() {
   const deployAIWorkflow = async () => {
     if (!aiResponseContent) {
       setStatus("Please generate an AI workflow first.");
-      setTimeout(() => setStatus(""), 3000);
+      setTimeout(() => setStatus(""), 30000);
       return;
     }
 
@@ -1285,19 +1245,22 @@ function App() {
       setIsDeployingAIWorkflow(true);
       setStatus("🚀 Deploying AI workflow...");
 
-      const response = await fetch("http://localhost:5000/deploy_ai_workflow", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          response_content: aiResponseContent,
-          use_case: useCase,
-          environment: deployConfig.environment,
-          user_code: userCode,
-          folder_name: deployConfig.folderName,
-        }),
-      });
+      const response = await fetch(
+        "http://localhost:5000/aiworkflow/deploy_ai_workflow",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            response_content: aiResponseContent,
+            use_case: useCase,
+            environment: deployConfig.environment,
+            user_code: userCode,
+            folder_name: deployConfig.folderName,
+          }),
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -1307,11 +1270,11 @@ function App() {
       const data = await response.json();
       setAiWorkflowData(data);
       setStatus("✅ AI workflow deployed successfully!");
-      setTimeout(() => setStatus(""), 3000);
+      setTimeout(() => setStatus(""), 30000);
     } catch (error) {
       console.error("AI workflow deployment error:", error);
       setStatus(`❌ Error: ${error.message}`);
-      setTimeout(() => setStatus(""), 3000);
+      setTimeout(() => setStatus(""), 30000);
     } finally {
       setIsDeployingAIWorkflow(false);
     }
@@ -1353,6 +1316,33 @@ function App() {
     );
   };
 
+  const handleBackToSelector = () => {
+    setSelectedView(null);
+  };
+
+  const restartWorkflow = () => {
+    // Reset all workflow-related state to initial values
+    setUseCase("");
+    setUserCode("");
+    setSelectedTechnologies([]);
+    setOptimalOrder(null);
+    setComplexWorkflow(null);
+    setNarrative("");
+    setTalkTrack("");
+    setProposedWorkflow(null);
+    setSelectedTechCategory("");
+    setDeployConfig({
+      environment: "saas_dev",
+      userCode: "LBA",
+      controlm_server: "IN01",
+    });
+    setDocumentationFile(null);
+    setAnalysisResult(null);
+    setDocumentationSkipped(false);
+    setStatus("Workflow restarted successfully!");
+    setTimeout(() => setStatus(""), 30000);
+  };
+
   return (
     <div className="app-container">
       {selectedView === null && (
@@ -1378,9 +1368,10 @@ function App() {
           generateAIWorkflow={generateAIWorkflow}
           regenerateAIWorkflow={regenerateAIWorkflow}
           deployAIWorkflow={deployAIWorkflow}
-          handlePersonalizedDeployConfirm={handlePersonalizedDeployConfirm}
+          handlePersonalizedDeployConfirm={handleDeployManualWorkflow}
           status={status}
           parseAIWorkflow={parseAIWorkflow}
+          onBackToSelector={handleBackToSelector}
         />
       )}
       {selectedView === "manual" && (
@@ -1393,12 +1384,12 @@ function App() {
           setSelectedTechnologies={setSelectedTechnologies}
           optimalOrder={optimalOrder}
           setOptimalOrder={setOptimalOrder}
+          complexWorkflow={complexWorkflow}
+          setComplexWorkflow={setComplexWorkflow}
           narrative={narrative}
           setNarrative={setNarrative}
           talkTrack={talkTrack}
           setTalkTrack={setTalkTrack}
-          renamedTechnologies={renamedTechnologies}
-          setRenamedTechnologies={setRenamedTechnologies}
           proposedWorkflow={proposedWorkflow}
           setProposedWorkflow={setProposedWorkflow}
           selectedTechCategory={selectedTechCategory}
@@ -1439,17 +1430,17 @@ function App() {
           workflowType={workflowType}
           showInstructions={showInstructions}
           setShowInstructions={setShowInstructions}
+          documentationSkipped={documentationSkipped}
+          setDocumentationSkipped={setDocumentationSkipped}
           toggleTechnologyInWorkflow={toggleTechnologyInWorkflow}
-          generateOptimalOrder={generateOptimalOrder}
+          generateManualWorkflow={generateManualWorkflow}
           generateNarrative={generateNarrative}
           generateTalkTrack={generateTalkTrack}
           generateProposedWorkflow={generateProposedWorkflow}
-          handlePersonalizeUseCase={handlePersonalizeUseCase}
           handleFileUpload={handleFileUpload}
           handleDocumentationUpload={handleDocumentationUpload}
           analyzeDocumentation={analyzeDocumentation}
-          handleDeployPersonalizedWorkflow={handleDeployPersonalizedWorkflow}
-          handlePersonalizedDeployConfirm={handlePersonalizedDeployConfirm}
+          handleDeployPersonalizedWorkflow={handleDeployManualWorkflow}
           handleDownloadWorkflow={handleDownloadWorkflow}
           handleSaveAsTemplate={handleSaveAsTemplate}
           saveTemplate={saveTemplate}
@@ -1462,6 +1453,8 @@ function App() {
           renderInstructions={renderInstructions}
           renderWorkflowItem={renderWorkflowItem}
           templateCategories={templateCategories}
+          onBackToSelector={handleBackToSelector}
+          restartWorkflow={restartWorkflow}
         />
       )}
     </div>

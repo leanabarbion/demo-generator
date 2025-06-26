@@ -8,8 +8,6 @@ from my_secrets import my_secrets
     
 # Somewhere global in your module
 JOB_LIBRARY = {
-        "job1": lambda: JobCommand("job1", command="echo JOB1"),
-        "job2": lambda: JobCommand("job2", command="echo JOB2"),
         "Data_SFDC": lambda: JobCommand(
             "zzt-Data-SFDC",
             description="JOB 1: retrieve_sales_data SalesForce CRM",

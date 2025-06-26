@@ -21,12 +21,24 @@ const AIWorkflowView = ({
   handlePersonalizedDeployConfirm,
   status,
   parseAIWorkflow,
+  onBackToSelector,
 }) => {
   return (
     <div className="ai-workflow-view">
       <div className="page-header">
-        <h1>DemoGen AI</h1>
-        <p className="page-subtitle">Let AI generate a workflow for you</p>
+        <div className="header-content">
+          <button
+            className="back-button"
+            onClick={onBackToSelector}
+            title="Back to view selector"
+          >
+            ← Back to Selector
+          </button>
+          <div className="header-text">
+            <h1>DemoGen AI</h1>
+            <p className="page-subtitle">Let AI generate a workflow for you</p>
+          </div>
+        </div>
       </div>
 
       <div className="use-case-section">

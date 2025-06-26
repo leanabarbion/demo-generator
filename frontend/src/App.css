@@ -327,13 +327,13 @@ body {
   padding: 2rem;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
 }
 
 .view-selector-header {
   text-align: center;
-  margin-bottom: 3rem;
+  margin: 2rem 0 3rem 0;
 }
 
 .view-selector .main-title {
@@ -751,6 +751,10 @@ body {
 @media (max-width: 768px) {
   .view-selector {
     padding: 1rem;
+  }
+
+  .view-selector-header {
+    margin: 1rem 0 2rem 0;
   }
 
   .view-selector .main-title {
