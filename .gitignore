@@ -22,16 +22,10 @@ package.json
 
 # Project specific
 # Backend - include all Python files and requirements.txt, exclude test folders and MD files
-backend/
 !backend/*.py
 !backend/requirements.txt
 !backend/output.json
 !backend/*/
-backend/*/test/
-backend/*/tests/
-backend/test/
-backend/tests/
-backend/*.md
 
 # Frontend - keep existing structure
 frontend/node_modules/
