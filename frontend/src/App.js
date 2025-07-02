@@ -9,7 +9,8 @@ import AIWorkflowView from "./components/AIWorkflowView";
 import ManualWorkflowView from "./components/ManualWorkflowView";
 
 // Get API URL from environment variable
-const API_BASE_URL = process.env.REACT_APP_API_URL || "0.0.0.0:5000";
+const API_BASE_URL =
+  process.env.REACT_APP_API_URL || "https://testdemogenai.vse.bmc.com";
 
 function App() {
   const [workflow, setWorkflow] = useState([]);
