@@ -16,7 +16,7 @@ load_dotenv()
 app = Flask(__name__)
 
 # Configure CORS
-CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(app, resources={r"/*": {"origins": ["https://testdemogenai.vse.bmc.com", "http://localhost:3000"]}})
 
 # Register blueprints
 app.register_blueprint(templates_bp, url_prefix='/templates')
