@@ -1,0 +1,50 @@
+{
+  "templateId": "template_1749727834",
+  "createdDate": "2025-06-12T13:30:34.737430",
+  "lastModified": "2025-06-12T13:30:34.737460",
+  "name": "EOD For investment banking",
+  "category": "Banking, Financial Services, Insurance",
+  "technologies": [
+    "Data_Market_API",
+    "Data_SFDC",
+    "AWS_DataPipeline",
+    "AWS_Backup",
+    "AWS_SQS",
+    "AWS_Lambda",
+    "AWS_QuickSight",
+    "JobDatabaseSQLScript",
+    "JobFileTransfer",
+    "AWS_Redshift"
+  ],
+  "workflowOrder": [
+    "Data_Market_API",
+    "Data_SFDC",
+    "AWS_DataPipeline",
+    "AWS_Backup",
+    "AWS_SQS",
+    "AWS_Lambda",
+    "AWS_QuickSight",
+    "JobDatabaseSQLScript",
+    "JobFileTransfer",
+    "AWS_Redshift"
+  ],
+  "useCase": "End of the day process for a investment banking using 10 technologies ",
+  "narrative": "# End of Day Investment Banking Workflow\n\n## Introduction\nThis workflow automates the end-of-day processing for an investment banking application. Its primary purpose is to aggregate data from multiple sources, perform data processing and analysis, and ensure the availability of critical information for decision-making by financial analysts and stakeholders. The workflow enhances operational efficiency, reduces manual intervention, and ensures timely data availability for analytical reporting.\n\n## Use Case Overview\nThe investment banking sector requires timely and accurate data to conduct analyses, manage risk, and support operations. This workflow addresses the business need for comprehensive data integration and reporting at the end of the trading day. By orchestrating multiple technologies, the workflow ensures that data from trading platforms, customer relationship management (CRM) systems, and analytical tools are seamlessly integrated and made available for review and reporting.\n\n## Technical Implementation\nThe workflow operates sequentially, following a prescribed order of operations. Each job performs a specific function, ensuring that the necessary data is processed and transferred correctly.\n\n1. **Data flow**: The workflow begins with data extraction from various sources (Data_Market_API and Data_SFDC). This data is then transformed and loaded into AWS Data Pipeline for processing. The processed data is backed up using AWS_Backup, ensuring data integrity. AWS_SQS is leveraged for message queuing, allowing for asynchronous job invocation. AWS_Lambda triggers further processing as required, culminating in data visualization in AWS QuickSight for end-users.\n\n2. **Dependencies and relationships**: Each job is dependent on the successful completion of the previous job. For instance, AWS Data Pipeline cannot start until both Data_Market_API and Data_SFDC have successfully gathered data. AWS_SQS is essential for communicating events between jobs, while AWS_Lambda depends on the results from AWS Data Pipeline before it can proceed.\n\n3. **Error handling and recovery**: The workflow incorporates robust error handling mechanisms. If any job fails, the workflow will automatically retry a specified number of times before escalating the issue for manual intervention. Alerts are configured to notify the operations team of any failures, ensuring rapid response times.\n\n4. **Performance considerations**: Performance monitoring is a key aspect of this workflow. Job execution times are logged, and performance metrics are collected to identify bottlenecks. Jobs are configured to run during off-peak hours to optimize resource usage, ensuring that the workflow does not adversely impact other operational processes.\n\n## Job Types and Technologies\n\n1. **Data_Market_API**\n   - Purpose: Extracts market data from external financial sources.\n   - Role: Serves as the first step in the data acquisition process.\n   - Configuration: API keys, data filters, and request frequency settings.\n\n2. **Data_SFDC**\n   - Purpose: Extracts customer and transaction data from Salesforce CRM.\n   - Role: Provides essential client information needed for analysis.\n   - Configuration: Salesforce API credentials, object types to extract, and query parameters.\n\n3. **AWS_DataPipeline**\n   - Purpose: Orchestrates the data transformation and processing tasks.\n   - Role: Automates the ETL (Extract, Transform, Load) processes.\n   - Configuration: Pipeline definitions, scheduling options, and data transformation scripts.\n\n4. **AWS_Backup**\n   - Purpose: Creates backups of critical data after processing.\n   - Role: Ensures data integrity and disaster recovery preparedness.\n   - Configuration: Backup schedules, storage locations, and retention policies.\n\n5. **AWS_SQS**\n   - Purpose: Manages message queuing for job orchestration.\n   - Role: Facilitates communication between various jobs in the workflow.\n   - Configuration: Queue names, visibility timeouts, and message retention settings.\n\n6. **AWS_Lambda**\n   - Purpose: Executes serverless functions for data processing.\n   - Role: Triggers additional processing tasks as needed.\n   - Configuration: Lambda function configurations, timeout settings, and memory allocation.\n\n7. **AWS_QuickSight**\n   - Purpose: Provides data visualization and analytics.\n   - Role: Enables stakeholders to generate reports and insights from processed data.\n   - Configuration: Data sources, analysis settings, and user permissions.\n\n8. **JobDatabaseSQLScript**\n   - Purpose: Executes SQL scripts on the database for data manipulation.\n   - Role: Handles any additional data processing that requires SQL.\n   - Configuration: Database connection strings, SQL script paths, and execution parameters.\n\n9. **JobFileTransfer**\n   - Purpose: Transfers files between different environments or systems.\n   - Role: Ensures that processed data is available in the necessary locations.\n   - Configuration: Source and destination paths, transfer protocols, and logging options.\n\n10. **AWS_Redshift**\n    - Purpose: Stores and manages large datasets for querying and analysis.\n    - Role: Acts as the central repository for all processed data.\n    - Configuration: Redshift cluster settings, connection configurations, and data load parameters.",
+  "renamedTechnologies": {
+    "AWS_Backup": "Cloud Data Backup",
+    "AWS_DataPipeline": "Data Movement Workflow",
+    "AWS_Lambda": "Event-Driven Processing",
+    "AWS_QuickSight": "Data Visualization Insights",
+    "AWS_Redshift": "Data Warehousing Solution",
+    "AWS_SQS": "Message Queue Management",
+    "Data_Market_API": "Market Data Integration",
+    "Data_SFDC": "Sales Data Sync",
+    "JobDatabaseSQLScript": "SQL Reporting Script",
+    "JobFileTransfer": "File Transfer Automation"
+  },
+  "environment": "saas_dev",
+  "userCode": "LBA",
+  "folderName": "DEMGEN_VB",
+  "application": "DMO-GEN",
+  "subApplication": "TEST-APP"
+}

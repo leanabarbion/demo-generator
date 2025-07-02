@@ -33,6 +33,9 @@ function App() {
     environment: "saas_dev",
     userCode: "LBA",
     controlm_server: "IN01", // Add default Control-M server
+    folderName: "demo-genai",
+    application: "demo-genai",
+    subApplication: "demo-genai",
   });
   const fileInputRef = useRef(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -260,7 +263,12 @@ function App() {
     }));
   };
 
-  const handleDeployManualWorkflow = async () => {
+  const handleDeployPersonalizedWorkflow = () => {
+    // Show the deployment configuration modal
+    setShowDeployModal(true);
+  };
+
+  const handlePersonalizedDeployConfirm = async () => {
     try {
       setShowDeployModal(false);
       setStatus("Deploying workflow...");
@@ -724,7 +732,8 @@ function App() {
               <li>
                 <span className="step-number">2</span>
                 <span className="step-text">
-                  Upload documentation files (PDF, DOC, DOCX, TXT) for analysis
+                  Upload documentation files (PDF, DOC, DOCX, TXT, XLSX, XLS)
+                  for analysis
                 </span>
               </li>
               <li>
@@ -1335,6 +1344,9 @@ function App() {
       environment: "saas_dev",
       userCode: "LBA",
       controlm_server: "IN01",
+      folderName: "demo-genai",
+      application: "demo-genai",
+      subApplication: "demo-genai",
     });
     setDocumentationFile(null);
     setAnalysisResult(null);
@@ -1368,7 +1380,7 @@ function App() {
           generateAIWorkflow={generateAIWorkflow}
           regenerateAIWorkflow={regenerateAIWorkflow}
           deployAIWorkflow={deployAIWorkflow}
-          handlePersonalizedDeployConfirm={handleDeployManualWorkflow}
+          handlePersonalizedDeployConfirm={handlePersonalizedDeployConfirm}
           status={status}
           parseAIWorkflow={parseAIWorkflow}
           onBackToSelector={handleBackToSelector}
@@ -1440,7 +1452,8 @@ function App() {
           handleFileUpload={handleFileUpload}
           handleDocumentationUpload={handleDocumentationUpload}
           analyzeDocumentation={analyzeDocumentation}
-          handleDeployPersonalizedWorkflow={handleDeployManualWorkflow}
+          handleDeployPersonalizedWorkflow={handleDeployPersonalizedWorkflow}
+          handlePersonalizedDeployConfirm={handlePersonalizedDeployConfirm}
           handleDownloadWorkflow={handleDownloadWorkflow}
           handleSaveAsTemplate={handleSaveAsTemplate}
           saveTemplate={saveTemplate}

@@ -39,3 +39,4 @@ tests/
 __pycache__/
 *.pyc
 
+temp_demo_repo/

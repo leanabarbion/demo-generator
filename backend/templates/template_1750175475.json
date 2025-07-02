@@ -1,0 +1,38 @@
+{
+  "templateId": "template_1750175475",
+  "createdDate": "2025-06-17T17:51:15.481984",
+  "lastModified": "2025-06-17T17:51:15.481997",
+  "name": "Automated Data Processing Pipeline ",
+  "category": "Banking, Financial Services, Insurance",
+  "technologies": [
+    "JobFileTransfer",
+    "AWS_DataPipeline",
+    "AWS_Glue",
+    "AWS_Lambda",
+    "AWS_SNS",
+    "AWS_QuickSight"
+  ],
+  "workflowOrder": [
+    "JobFileTransfer",
+    "AWS_DataPipeline",
+    "AWS_Glue",
+    "AWS_Lambda",
+    "AWS_SNS",
+    "AWS_QuickSight"
+  ],
+  "useCase": "Implement an automated data processing pipeline to handle daily financial transactions, perform data validation, generate reports, and distribute them to multiple departments. The solution should include automated file collection, secure data transfer, data transformation, reporting, error handling, and an audit trail.",
+  "narrative": "",
+  "renamedTechnologies": {
+    "AWS_DataPipeline": "Automated Data Pipeline",
+    "AWS_Glue": "Data Transformation Engine",
+    "AWS_Lambda": "Serverless Processing Function",
+    "AWS_QuickSight": "Business Reporting Dashboard",
+    "AWS_SNS": "Notification Distribution Service",
+    "JobFileTransfer": "Secure File Collector"
+  },
+  "environment": "saas_dev",
+  "userCode": "LBA",
+  "folderName": "DEMGEN_VB",
+  "application": "DMO-GEN",
+  "subApplication": "TEST-APP"
+}

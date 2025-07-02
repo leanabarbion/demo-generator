@@ -3,7 +3,7 @@
 # consider using Python 3.11 or 3.12 for better package support.
 
 # Core Flask and web framework
-flask==2.0.1
+flask==3.1.0
 flask-cors==3.0.10
 
 # Environment and configuration
@@ -14,7 +14,6 @@ openai==1.61.1
 
 # Control-M Python Client and AAPI
 ctm_python_client
-aapi
 
 # HTTP and networking
 requests

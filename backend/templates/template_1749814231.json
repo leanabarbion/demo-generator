@@ -1,0 +1,37 @@
+{
+  "templateId": "template_1749814231",
+  "createdDate": "2025-06-13T13:30:31.828727",
+  "lastModified": "2025-06-13T13:30:31.828731",
+  "name": "Demand Forecasting process using 5 technologies",
+  "category": "Consumer Goods",
+  "technologies": [
+    "Data_Weather_API",
+    "Data_SAP_inventory",
+    "AWS_SageMaker",
+    "AWS_QuickSight",
+    "AWS_DataPipeline",
+    "AZURE_LogicApps",
+    "AWS_Backup"
+  ],
+  "workflowOrder": [
+    "Data_Weather_API",
+    "Data_SAP_inventory",
+    "AWS_SageMaker",
+    "AWS_DataPipeline",
+    "AWS_QuickSight"
+  ],
+  "useCase": "Demand Forecasting process using 5 technologies",
+  "narrative": "# Demand Forecasting Process Workflow\n\n## Introduction\nThe Demand Forecasting Process Workflow leverages various technologies to analyze and predict demand trends, optimizing inventory levels and enhancing decision-making for resource allocation. This workflow improves business value by integrating weather data and inventory information, thereby allowing for more accurate forecasting and reducing excess stock costs.\n\n## Use Case Overview\nBusinesses need to anticipate customer demand accurately to maintain optimal inventory levels while minimizing costs. The primary objective of this workflow is to amalgamate weather data with SAP inventory information to derive insights into potential demand variations. By utilizing AWS SageMaker for modeling and AWS QuickSight for visualizing the results, businesses can make informed decisions that align supply with demand.\n\n## Technical Implementation\nThe Demand Forecasting Process Workflow executes a series of sequential jobs, where each job feeds data into the next:\n\n1. **Data Flow**: \n   - The workflow begins by collecting real-time weather data through the `Data_Weather_API`, which then feeds this data into the `Data_SAP_inventory` job.\n   - The `Data_SAP_inventory` job retrieves the current inventory data from SAP and merges it with weather insights to create a comprehensive dataset for demand forecasting.\n   - Subsequently, AWS SageMaker processes this dataset to develop a predictive model based on historical demand trends, utilizing both weather conditions and inventory data.\n   - The produced model is executed, and the forecast results are stored using AWS DataPipeline for structured access and management.\n   - Finally, AWS QuickSight visualizes the forecasting results, providing actionable insights through dashboards and reports.\n\n2. **Dependencies and Relationships**:\n   - Each job is dependent on the successful completion of the preceding job. The entire workflow is structured to ensure that data integrity and accuracy are maintained throughout each step.\n\n3. **Error Handling and Recovery**:\n   - Should a job fail, the workflow will trigger pre-defined alerts to notify the responsible team. Automatic retries can be configured for transient failures, and fallback mechanisms are in place to revert to previous stable states where applicable.\n\n4. **Performance Considerations**:\n   - The workflow is optimized for minimal latency, with batch data processing scheduled during off-peak hours. AWS services are utilized for their scalability, allowing them to handle varying data volumes without compromising performance.\n\n## Job Types and Technologies\n\n1. **Data_Weather_API**\n   - **Purpose**: To gather real-time weather data, which is crucial for predicting demand variances influenced by weather patterns.\n   - **Role**: Serves as the initial data source for the workflow, driving insights that correlate with demand forecasting.\n   - **Configuration**: API endpoints configured with authentication parameters, data filters for relevant weather metrics, and output formats.\n\n2. **Data_SAP_inventory**\n   - **Purpose**: To extract inventory levels stored within the SAP system, providing necessary context for forecasting analysis.\n   - **Role**: Integrates with the data retrieved from the Weather API to furnish a complete view of inventory against demand predictions.\n   - **Configuration**: SAP credentials, data extraction parameters, and specific inventory tables defined for data retrieval.\n\n3. **AWS_SageMaker**\n   - **Purpose**: To build, train, and deploy machine learning models that predict future demand based on historical data.\n   - **Role**: Analyzes the combined dataset from the previous jobs to generate predictive analytics.\n   - **Configuration**: SageMaker notebook instances set with appropriate ML algorithms, parameters for model training, and output configurations for results storage.\n\n4. **AWS_DataPipeline**\n   - **Purpose**: To facilitate the ingestion, movement, and orchestration of the forecast data.\n   - **Role**: Manages the data workflow, ensuring efficient transfer of forecasting results to storage or further analysis.\n   - **Configuration**: Pipeline configuration files specifying data sources, scheduling, and transformation tasks.\n\n5. **AWS_QuickSight**\n   - **Purpose**: To provide business intelligence visualizations and dashboards for data-driven decision making.\n   - **Role**: Presents the forecasting results in an easily interpretable format, allowing stakeholders to understand trends and make informed decisions.\n   - **Configuration**: Data source connections, dashboard design templates, and user access controls established for collaborative analytics.",
+  "renamedTechnologies": {
+    "AWS_DataPipeline": "Data Integration Workflow",
+    "AWS_QuickSight": "Forecasting Dashboard",
+    "AWS_SageMaker": "Forecasting Model Builder",
+    "Data_SAP_inventory": "Inventory Management System",
+    "Data_Weather_API": "Weather Data Source"
+  },
+  "environment": "saas_dev",
+  "userCode": "LBA",
+  "folderName": "DEMGEN_VB",
+  "application": "DMO-GEN",
+  "subApplication": "TEST-APP"
+}
