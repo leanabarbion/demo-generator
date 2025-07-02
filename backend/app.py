@@ -26,4 +26,4 @@ app.register_blueprint(aiworkflow_bp, url_prefix='/aiworkflow')
 app.register_blueprint(manualworkflow_bp, url_prefix='/manualworkflow')
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True,host='0.0.0.0')
