@@ -12,6 +12,10 @@ import ManualWorkflowView from "./components/ManualWorkflowView";
 const API_BASE_URL =
   process.env.REACT_APP_API_URL || "https://testdemogenai.vse.bmc.com/api";
 
+// Debug: Log the API URL being used
+console.log("API_BASE_URL:", API_BASE_URL);
+console.log("Environment variable:", process.env.REACT_APP_API_URL);
+
 function App() {
   const [workflow, setWorkflow] = useState([]);
   const [useCase, setUseCase] = useState("");
