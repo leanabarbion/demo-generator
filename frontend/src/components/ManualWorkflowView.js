@@ -143,6 +143,10 @@ const ManualWorkflowView = ({
   // State to control workflow actions visibility
   const [showWorkflowActions, setShowWorkflowActions] = React.useState(false);
 
+  // State to control modal visibility
+  const [showNarrativeModal, setShowNarrativeModal] = React.useState(false);
+  const [showTalkTrackModal, setShowTalkTrackModal] = React.useState(false);
+
   // Utility: check if two arrays have the same elements in the same order
   const isCurrentSelectionAISuggested = React.useMemo(() => {
     // If there's a proposed workflow, consider it AI-suggested even if modified
@@ -192,7 +196,7 @@ const ManualWorkflowView = ({
                   : "Show Workflow Actions"
               }
             >
-              <span className="toggle-icon">⚙️</span>
+              <span className="toggle-icon">Open for Full Menu</span>
               <span
                 className={`toggle-arrow ${
                   showWorkflowActions ? "expanded" : ""
@@ -336,7 +340,7 @@ const ManualWorkflowView = ({
                     <input
                       type="file"
                       onChange={handleDocumentationUpload}
-                      accept=".txt,.doc,.docx,.pdf"
+                      accept=".txt,.doc,.docx,.pdf,.xlsx,.xls"
                       id="documentation-upload"
                       style={{ display: "none" }}
                     />
@@ -793,6 +797,62 @@ const ManualWorkflowView = ({
                     </div>
                   )}
 
+                  {(narrative || talkTrack) && (
+                    <div className="documentation-sidebar">
+                      <div className="documentation-row">
+                        {narrative && (
+                          <div
+                            className="documentation-compact clickable-narrative"
+                            onClick={() => setShowNarrativeModal(true)}
+                            style={{ cursor: "pointer" }}
+                          >
+                            <div className="documentation-compact-header">
+                              <h4>📄 Documentation</h4>
+                              <span className="documentation-compact-hint">
+                                Click to expand
+                              </span>
+                            </div>
+                            <div className="documentation-compact-preview">
+                              <div
+                                dangerouslySetInnerHTML={{
+                                  __html: marked(
+                                    narrative.substring(0, 300) +
+                                      (narrative.length > 300 ? "..." : "")
+                                  ),
+                                }}
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {talkTrack && (
+                          <div
+                            className="documentation-compact clickable-talktrack"
+                            onClick={() => setShowTalkTrackModal(true)}
+                            style={{ cursor: "pointer" }}
+                          >
+                            <div className="documentation-compact-header">
+                              <h4>🎤 Talk Track</h4>
+                              <span className="documentation-compact-hint">
+                                Click to expand
+                              </span>
+                            </div>
+                            <div className="documentation-compact-preview">
+                              <div
+                                dangerouslySetInnerHTML={{
+                                  __html: marked(
+                                    talkTrack.substring(0, 300) +
+                                      (talkTrack.length > 300 ? "..." : "")
+                                  ),
+                                }}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Complex Workflow Structure */}
                   <div className="complex-workflow">
                     <h3>Complex Workflow Structure</h3>
@@ -830,30 +890,6 @@ const ManualWorkflowView = ({
                                   </div>
                                 </div>
 
-                                {/* Events */}
-                                {(subfolder.events.add.length > 0 ||
-                                  subfolder.events.wait.length > 0 ||
-                                  subfolder.events.delete.length > 0) && (
-                                  <div className="subfolder-events">
-                                    {subfolder.events.add.length > 0 && (
-                                      <span className="event-add">
-                                        Add: {subfolder.events.add.join(", ")}
-                                      </span>
-                                    )}
-                                    {subfolder.events.wait.length > 0 && (
-                                      <span className="event-wait">
-                                        Wait: {subfolder.events.wait.join(", ")}
-                                      </span>
-                                    )}
-                                    {subfolder.events.delete.length > 0 && (
-                                      <span className="event-delete">
-                                        Delete:{" "}
-                                        {subfolder.events.delete.join(", ")}
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
-
                                 <div className="subfolder-jobs-list">
                                   {subfolderJobs.map((job, jobIndex) => (
                                     <div
@@ -870,18 +906,6 @@ const ManualWorkflowView = ({
                                         <span className="job-type">
                                           {job.type}
                                         </span>
-                                      </div>
-                                      <div className="job-details">
-                                        <span className="job-group">
-                                          Group: {job.concurrent_group}
-                                        </span>
-                                        {job.wait_for_jobs &&
-                                          job.wait_for_jobs.length > 0 && (
-                                            <span className="job-dependencies">
-                                              Waits:{" "}
-                                              {job.wait_for_jobs.join(", ")}
-                                            </span>
-                                          )}
                                       </div>
                                     </div>
                                   ))}
@@ -992,18 +1016,6 @@ const ManualWorkflowView = ({
                 </div>
               )}
             </div>
-
-            {narrative && (
-              <div className="narrative-display">
-                <div dangerouslySetInnerHTML={{ __html: marked(narrative) }} />
-              </div>
-            )}
-
-            {talkTrack && (
-              <div className="talk-track-display">
-                <div dangerouslySetInnerHTML={{ __html: marked(talkTrack) }} />
-              </div>
-            )}
           </div>
         )}
       </div>
@@ -1059,7 +1071,7 @@ const ManualWorkflowView = ({
                 <option value="PROD">PROD</option>
               </select>
             </div>
-            <div className="form-group">
+            {/* <div className="form-group">
               <label>User Code:</label>
               <input
                 type="text"
@@ -1067,7 +1079,7 @@ const ManualWorkflowView = ({
                 onChange={(e) => setUserCode(e.target.value)}
                 placeholder="Enter user code (LBA)"
               />
-            </div>
+            </div> */}
             <div className="form-group">
               <label>Folder Name:</label>
               <input
@@ -1351,12 +1363,84 @@ const ManualWorkflowView = ({
                   placeholder="Update workflow configuration"
                 />
               </div>
-              <div className="modal-actions">
+              <div className="modal-buttons">
                 <button onClick={() => setShowGithubModal(false)}>
                   Cancel
                 </button>
                 <button onClick={handleGithubUpload}>Upload</button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Narrative Modal */}
+      {showNarrativeModal && (
+        <div
+          className="modal-overlay narrative-modal-overlay"
+          onClick={() => setShowNarrativeModal(false)}
+        >
+          <div
+            className="modal-content narrative-modal-content"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h2>📄 Generated Documentation</h2>
+              <button
+                className="modal-close-button"
+                onClick={() => setShowNarrativeModal(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body narrative-modal-body">
+              <div className="narrative-full-content">
+                <div dangerouslySetInnerHTML={{ __html: marked(narrative) }} />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                className="action-button"
+                onClick={() => setShowNarrativeModal(false)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Talk Track Modal */}
+      {showTalkTrackModal && (
+        <div
+          className="modal-overlay talktrack-modal-overlay"
+          onClick={() => setShowTalkTrackModal(false)}
+        >
+          <div
+            className="modal-content talktrack-modal-content"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h2>🎤 Generated Talk Track</h2>
+              <button
+                className="modal-close-button"
+                onClick={() => setShowTalkTrackModal(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body talktrack-modal-body">
+              <div className="talktrack-full-content">
+                <div dangerouslySetInnerHTML={{ __html: marked(talkTrack) }} />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                className="action-button"
+                onClick={() => setShowTalkTrackModal(false)}
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
