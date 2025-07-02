@@ -8,6 +8,9 @@ import ViewSelector from "./components/ViewSelector";
 import AIWorkflowView from "./components/AIWorkflowView";
 import ManualWorkflowView from "./components/ManualWorkflowView";
 
+// Get API URL from environment variable
+const API_BASE_URL = process.env.REACT_APP_API_URL || "0.0.0.0:5000";
+
 function App() {
   const [workflow, setWorkflow] = useState([]);
   const [useCase, setUseCase] = useState("");
@@ -111,7 +114,7 @@ function App() {
     try {
       setStatus("Generating manual workflow...");
       const response = await fetch(
-        "http://localhost:5000/manualworkflow/generate_manual_workflow",
+        `${API_BASE_URL}/manualworkflow/generate_manual_workflow`,
         {
           method: "POST",
           headers: {
@@ -174,7 +177,7 @@ function App() {
 
     try {
       const response = await fetch(
-        "http://localhost:5000/documentation/generate-narrative",
+        `${API_BASE_URL}/documentation/generate-narrative`,
         {
           method: "POST",
           headers: {
@@ -221,7 +224,7 @@ function App() {
 
     try {
       const response = await fetch(
-        "http://localhost:5000/documentation/generate-talktrack",
+        `${API_BASE_URL}/documentation/generate-talktrack`,
         {
           method: "POST",
           headers: {
@@ -304,7 +307,7 @@ function App() {
       }
 
       const response = await fetch(
-        "http://localhost:5000/manualworkflow/deploy_manual_workflow",
+        `${API_BASE_URL}/manualworkflow/deploy_manual_workflow`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -336,7 +339,7 @@ function App() {
     try {
       setStatus("Preparing workflow download...");
       const response = await fetch(
-        "http://localhost:5000/importexport/download_workflow",
+        `${API_BASE_URL}/importexport/download_workflow`,
         {
           method: "POST",
           headers: {
@@ -393,7 +396,7 @@ function App() {
 
     try {
       const response = await fetch(
-        "http://localhost:5000/manualworkflow/proposed_workflow",
+        `${API_BASE_URL}/manualworkflow/proposed_workflow`,
         {
           method: "POST",
           headers: {
@@ -463,7 +466,7 @@ function App() {
       formData.append("file", file);
 
       const response = await fetch(
-        "http://localhost:5000/importexport/upload_workflow",
+        `${API_BASE_URL}/importexport/upload_workflow`,
         {
           method: "POST",
           body: formData,
@@ -514,7 +517,7 @@ function App() {
       formData.append("use_case", useCase);
 
       const response = await fetch(
-        "http://localhost:5000/importexport/analyze_documentation",
+        `${API_BASE_URL}/importexport/analyze_documentation`,
         {
           method: "POST",
           body: formData,
@@ -818,7 +821,7 @@ function App() {
     console.log("🔍 Checking for existing template...");
     try {
       const response = await fetch(
-        "http://localhost:5000/templates/check_template_exists",
+        `${API_BASE_URL}/templates/check_template_exists`,
         {
           method: "POST",
           headers: {
@@ -870,28 +873,25 @@ function App() {
     });
 
     try {
-      const response = await fetch(
-        "http://localhost:5000/templates/save_template",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            name: templateName,
-            category: templateCategory,
-            technologies: selectedTechnologies,
-            workflowOrder: optimalOrder,
-            useCase: useCase,
-            narrative: narrative,
-            environment: deployConfig.environment,
-            userCode: userCode,
-            folderName: deployConfig.folderName,
-            application: deployConfig.application,
-            subApplication: deployConfig.subApplication,
-          }),
-        }
-      );
+      const response = await fetch(`${API_BASE_URL}/templates/save_template`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: templateName,
+          category: templateCategory,
+          technologies: selectedTechnologies,
+          workflowOrder: optimalOrder,
+          useCase: useCase,
+          narrative: narrative,
+          environment: deployConfig.environment,
+          userCode: userCode,
+          folderName: deployConfig.folderName,
+          application: deployConfig.application,
+          subApplication: deployConfig.subApplication,
+        }),
+      });
 
       if (response.ok) {
         const result = await response.json();
@@ -952,7 +952,7 @@ function App() {
 
         // Update the existing template
         const response = await fetch(
-          "http://localhost:5000/templates/update_template",
+          `${API_BASE_URL}/templates/update_template`,
           {
             method: "POST",
             headers: {
@@ -1014,9 +1014,7 @@ function App() {
   const handleUseTemplate = async () => {
     console.log("🔍 handleUseTemplate called - fetching templates");
     try {
-      const response = await fetch(
-        "http://localhost:5000/templates/list_templates"
-      );
+      const response = await fetch(`${API_BASE_URL}/templates/list_templates`);
       if (!response.ok) {
         throw new Error("Failed to fetch templates");
       }
@@ -1055,7 +1053,7 @@ function App() {
   const handleDeleteTemplate = async (templateId) => {
     try {
       const response = await fetch(
-        "http://localhost:5000/templates/delete_template",
+        `${API_BASE_URL}/templates/delete_template`,
         {
           method: "POST",
           headers: {
@@ -1098,7 +1096,7 @@ function App() {
 
       // First, create the workflow
       const createResponse = await fetch(
-        "http://localhost:5000/manualworkflow/create_workflow",
+        `${API_BASE_URL}/manualworkflow/create_workflow`,
         {
           method: "POST",
           headers: {
@@ -1125,7 +1123,7 @@ function App() {
 
       // Now upload to GitHub
       const githubResponse = await fetch(
-        "http://localhost:5000/importexport/upload-github",
+        `${API_BASE_URL}/importexport/upload-github`,
         {
           method: "POST",
           headers: {
@@ -1166,7 +1164,7 @@ function App() {
       setStatus("🤖 Generating AI workflow...");
 
       const response = await fetch(
-        "http://localhost:5000/aiworkflow/ai_prompt_workflow",
+        `${API_BASE_URL}/aiworkflow/ai_prompt_workflow`,
         {
           method: "POST",
           headers: {
@@ -1213,7 +1211,7 @@ function App() {
       setAiWorkflowData(null);
 
       const response = await fetch(
-        "http://localhost:5000/aiworkflow/ai_prompt_workflow",
+        `${API_BASE_URL}/aiworkflow/ai_prompt_workflow`,
         {
           method: "POST",
           headers: {
@@ -1255,7 +1253,7 @@ function App() {
       setStatus("🚀 Deploying AI workflow...");
 
       const response = await fetch(
-        "http://localhost:5000/aiworkflow/deploy_ai_workflow",
+        `${API_BASE_URL}/aiworkflow/deploy_ai_workflow`,
         {
           method: "POST",
           headers: {
