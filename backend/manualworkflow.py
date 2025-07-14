@@ -169,7 +169,7 @@ def create_workflow():
 
         defaults = WorkflowDefaults(
             run_as="ctmagent",
-            host="zzz-linux-agents",
+            host="demogenai",
             application=formatted_application,
             sub_application=formatted_sub_application
         )
@@ -267,7 +267,7 @@ def generate_workflow():
 
         defaults = WorkflowDefaults(
             run_as="ctmagent",
-            host="zzz-linux-agents",
+            host="demogenai",
             application=formatted_application,
             sub_application=formatted_sub_application
         )
@@ -612,7 +612,7 @@ def generate_manual_workflow():
 
             defaults = WorkflowDefaults(
                 run_as="ctmagent",
-                host="zzz-linux-agents",
+                host="demogenai",
                 application=formatted_application,
                 sub_application=formatted_sub_application
             )
@@ -870,7 +870,7 @@ def deploy_manual_workflow():
             # Create workflow defaults
             defaults = WorkflowDefaults(
                 run_as="ctmagent",
-                host="zzz-linux-agents",
+                host="demogenai",
                 application=formatted_application,
                 sub_application=formatted_sub_application
             )

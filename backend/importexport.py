@@ -24,8 +24,8 @@ load_dotenv()
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 if not GITHUB_TOKEN:
     raise ValueError("GitHub token not found in environment variables. Please set GITHUB_TOKEN in your .env file.")
-REPO_OWNER = "leanabarbion"
-REPO_NAME = "workflow-repo"  # Replace with your repo name
+REPO_OWNER = "BMCDBA-Presales"
+REPO_NAME = "GEN-AI-demo-generator"  # Replace with your repo name
 BRANCH = "main"
 BASE_FOLDER_PATH = "jobs"  # Folder where files will be uploaded
 
@@ -116,7 +116,7 @@ def download_workflow():
 
     defaults = WorkflowDefaults(
         run_as="ctmagent",
-        host="zzz-linux-agents",
+        host="demogenai",
         application=formatted_application,
         sub_application=formatted_sub_application
     )

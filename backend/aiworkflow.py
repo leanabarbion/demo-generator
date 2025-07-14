@@ -253,7 +253,7 @@ def ai_generated_workflow():
         # Create workflow defaults
         defaults = WorkflowDefaults(
             run_as="ctmagent",
-            host="zzz-linux-agents",
+            host="demogenai",
             application=formatted_application,
             sub_application=formatted_sub_application
         )

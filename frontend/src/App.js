@@ -9,8 +9,7 @@ import AIWorkflowView from "./components/AIWorkflowView";
 import ManualWorkflowView from "./components/ManualWorkflowView";
 
 // Get API URL from environment variable
-const API_BASE_URL =
-  process.env.REACT_APP_API_URL || "https://testdemogenai.vse.bmc.com/api";
+const API_BASE_URL = process.env.REACT_APP_API_URL;
 
 // Debug: Log the API URL being used
 console.log("API_BASE_URL:", API_BASE_URL);
@@ -52,7 +51,7 @@ function App() {
   const [confirmAction, setConfirmAction] = useState(null);
   const [selectedTechCategory, setSelectedTechCategory] = useState("");
   const [githubConfig, setGithubConfig] = useState({
-    repository: "leanabarbion/workflow-repo",
+    repository: "BMCDBA-Presales/GEN-AI-demo-generator",
     branch: "main",
     path: "workflows",
     commitMessage: "Update workflow configuration",

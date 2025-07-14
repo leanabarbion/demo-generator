@@ -11,37 +11,43 @@ JOB_LIBRARY = {
         "Data_SFDC": lambda: JobCommand(
             "zzt-Data-SFDC",
             description="JOB 1: retrieve_sales_data SalesForce CRM",
-            command='curl "https://data.nasdaq.com/api/v3/datatables/EVEST/MDFIRM?api_key=EQ7KseM9AiJk9Xye7KAK"'
+            command='curl "https://data.nasdaq.com/api/v3/datatables/EVEST/MDFIRM?api_key=EQ7KseM9AiJk9Xye7KAK"',
+            run_as_dummy=True
         ), 
     "Data_SAP_inventory": lambda: JobSAPR3BatchInputSession(
         "zzt-Data-SAP-inventory",
         description="JOB 2: retrieve_inventory_data SAP ERP",
         connection_profile="SAPCP",
         target="SAP_SERVER",
-        session=JobSAPR3BatchInputSession.Session("Stock_Session")
+        session=JobSAPR3BatchInputSession.Session("Stock_Session"),
+        run_as_dummy=True
     ),
     "Data_Market_API": lambda: JobCommand(
         "zzt-Market-Data-API",
         description="JOB 3: Retrieve market data from external APIs (e.g. Alpha Vantage)",
-        command='curl "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=IBM&apikey=%%apikey"'
+        command='curl "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=IBM&apikey=%%apikey"',
+        run_as_dummy=True
     ),
     "Data_Weather_API": lambda: JobCommand(
         "zzt-Weather-Data-API",
         description="JOB 4: Retrieve weather data from external APIs (e.g. OpenWeatherMap)",
-        command='wget "https://api.openweathermap.org/data/2.5/weather?zip=%%zipcode,us&appid=%%appid&units=imperial" -O $HOME/output.json'
+        command='wget "https://api.openweathermap.org/data/2.5/weather?zip=%%zipcode,us&appid=%%appid&units=imperial" -O $HOME/output.json',
+        run_as_dummy=True
     ),
     "JobDatabaseSQLScript": lambda: JobDatabaseSQLScript(
         "zzt-Oracle-Data",
         connection_profile="ZZT-ORACLE-SALES",
         sql_script="export_store_sales.sql",
         output_sql_output="Y",
-        description="JOB 5: Retrieve data from Oracle database"
+        description="JOB 5: Retrieve data from Oracle database",
+        run_as_dummy=True
     ),
     "JobFileTransfer": lambda: JobFileTransfer(
         "zzt-Transfer-to-Centralized-Repo",
         connection_profile_src="ZZM_SFTP_AGT1",
         connection_profile_dest="ZZM_FS_LOCAL",
         description="Job 5: Collect and aggregate data into a centralized repository using CTM MFT",
+        run_as_dummy=True,
         file_transfers=[{
             "ABSTIME": "0", "VERNUM": "0", "Dest": "/opt/controlm/ctm/DemandForecast/",
             "ContinueOnFailure": False, "SRC_PATTERN": "Wildcard", "SRCOPT": "0",
@@ -64,26 +70,45 @@ JOB_LIBRARY = {
     ),
     "Data_Storage_AWS_S3": lambda: JobFileTransfer(
         "zzt-Data-Storage-AWS-S3",
-        connection_profile_src="ZZM_SFTP_AGT1",
-        connection_profile_dest="ZZM_FS_LOCAL",
+        connection_profile_src="ZZM_LOCAL",
+        connection_profile_dest="ZZM_AWS_S3",
+        s3_bucket_name="automated-demos",
         description="Job 5: Store aggregated data in AWS S3 using CTM MFT",
         file_transfers=[{
-            "ABSTIME": "0", "VERNUM": "0", "Dest": "/opt/controlm/ctm/DemandForecast/",
-            "ContinueOnFailure": False, "SRC_PATTERN": "Wildcard", "SRCOPT": "0",
-            "DeleteFileOnDestIfFails": False, "TransferType": "Binary", "CASEIFS": "0",
-            "DSTOPT": "0", "RECURSIVE": "0", "TransferOption": "SrcToDest", "Src": "/",
-            "TIMELIMIT": "0", "FailJobOnDestCommandFailure": False, "EXCLUDE_WILDCARD": "0",
-            "NULLFLDS": "0", "FailJobOnDestActionFailure": False, "TRIM": "1", "IF_EXIST": "0",
-            "FailJobOnSourceCommandFailure": False, "UNIQUE": "0",
+            "TransferType": "Binary",
+            "TransferOption": "SrcToDest",
+            "Src": "/home/ctmagent/mft/outbound/dummy.file",
+            "Dest": "/filetransfers/in/",
+            "SRC_PATTERN": "Wildcard",
+            "ABSTIME": "0",
+            "TIMELIMIT": "0",
+            "UNIQUE": "0",
+            "SRCOPT": "0",
+            "IF_EXIST": "0",
+            "DSTOPT": "0",
+            "ContinueOnFailure": False,
+            "DeleteFileOnDestIfFails": False,
+            "FailJobOnDestActionFailure": False,
+            "FailJobOnSourceCommandFailure": False,
+            "FailJobOnDestCommandFailure": False,
+            "RECURSIVE": "0",
+            "EXCLUDE_WILDCARD": "0",
+            "TRIM": "1",
+            "NULLFLDS": "0",
+            "VERNUM": "0",
+            "CASEIFS": "0",
             "FileWatcherOptions": {
-                "UnitsOfTimeLimit": "Minutes", "SkipToNextFileIfCriteriaNotMatch": False,
-                "MinDetectedSizeInBytes": "0"
+                "MinDetectedSizeInBytes": "0",
+                "UnitsOfTimeLimit": "Minutes",
+                "SkipToNextFileIfCriteriaNotMatch": False
             },
-            "SimultaneousTransfer": {"TransferMultipleFilesSimultaneously": False},
             "IncrementalTransfer": {
                 "IncrementalTransferEnabled": False,
                 "MaxModificationAgeForFirstRunEnabled": False,
-                "MaxModificationAgeForFirstRunInHours": "1"
+                "MaxModificationAgeForFirstRunInHours": "0"
+            },
+            "SimultaneousTransfer": {
+                "TransferMultipleFilesSimultaneously": False
             }
         }]
     ),
@@ -93,20 +118,23 @@ JOB_LIBRARY = {
         description="JOB 8: Aggregate and analyse data using Hadoop",
         program_jar="/home/user1/hadoop-jobs/hadoop-mapreduce-examples.jar",
         main_class="com.mycomp.mainClassName",
-        arguments=["arg1", "arg2"]
+        arguments=["arg1", "arg2"],
+        run_as_dummy=True
     ),
     "JobSLAManagement": lambda: JobSLAManagement(
         "zzt-Demand-Forecasting-Process-SLA",
         service_name="Demand Forecasting Service",
-        job_runs_deviations_tolerance="3"
-    ),"AWS_AppFlow": lambda: JobAwsAppFlow(
+        job_runs_deviations_tolerance="3",
+        run_as_dummy=True
+    ),    "AWS_AppFlow": lambda: JobAwsAppFlow(
         "zzt-aws-app-flow",
         description="AWS AppFlow",
         connection_profile="ZZZ_AWS_APPFLOW",
         action="Trigger Flow - Key & Secret Auth",
         flow_name="testflow1",
         trigger_flow_with_idempotency_token="checked",
-        client_token="Token_Control-1_for_AppFlow%%ORDERID"
+        client_token="Token_Control-1_for_AppFlow%%ORDERID",
+        run_as_dummy=True
     ),
     "AWS_AppRunner": lambda: JobAwsAppRunner(
         "zzt-aws-app-runner",
@@ -135,14 +163,13 @@ JOB_LIBRARY = {
         idempotency_token="token12345"
     ),
     "AWS_Batch": lambda: JobAwsBatch(
-        "zzt-aws-batch",
-        connection_profile="ZZZ_AWS_BATCH",
-        job_name="job_name",
-        job_definition_and_revision="zzz-batch-job-definition:1",
-        job_queue="zzz-batch-job-queue",
+        "zzz-aws-batch",
+        connection_profile="ZZZ-AWS-BATCH",
+        job_name="first-run-job",
+        job_definition_and_revision="first-run-batch:2",
+        job_queue="first-run-job-queue",
         job_attempts="2",
-        use_advanced_json_format="unchecked",
-        container_overrides_command='["echo", "hello from control-m"]'
+        use_advanced_json_format="unchecked"
     ),
     "AWS_CloudFormation": lambda: JobAwsCloudFormation(
         "zzt-aws-cloudformation",
@@ -179,7 +206,8 @@ JOB_LIBRARY = {
         action="Execute Statement",
         run_statement_with_parameter="checked",
         statement="Select * From IFteam  where Id=? OR Name=?",
-        statement_parameters='[{"N": "20"},{"S":"Stas30"}]'
+        statement_parameters='[{"N": "20"},{"S":"Stas30"}]',
+        run_as_dummy=True
     ),
     "AWS_EC2": lambda: JobAwsEC2(
         "zzt-aws-ec2",
@@ -190,7 +218,8 @@ JOB_LIBRARY = {
         instance_type="m1.small",
         subnet_id="subnet-00aa899a7db25494d",
         key_name="ksu-aws-ec2-key-pair",
-        get_instances_logs="unchecked"
+        get_instances_logs="unchecked",
+        run_as_dummy=True
     ),
     "AWS_ECS": lambda: JobAwsECS(
         "zzt-aws-ecs",
@@ -204,7 +233,8 @@ JOB_LIBRARY = {
         override_container="IntegrationURI",
         override_command="\"/bin/sh -c 'whoami'\"",
         environment_variables='{"name": "var1", "value": "1"}',
-        get_logs="Get Logs"
+        get_logs="Get Logs",
+        run_as_dummy=True
     ),
     "AWS_EMR": lambda: JobAwsEMR(
         "zzt-aws-emr",
@@ -214,26 +244,27 @@ JOB_LIBRARY = {
         relative_path="ShowWaitingAndRunningClusters.ipynb",
         notebook_execution_name="TestExec",
         service_role="EMR_Notebooks_DefaultRole",
-        use_advanced_json_format="unchecked"
+        use_advanced_json_format="unchecked",
+        run_as_dummy=True
     ),
     "AWS_Glue": lambda: JobAwsGlue(
-        "zzt-aws-glue",
-        connection_profile="ZZZ_AWS_GLUE",
-        glue_job_name="ZZZ_GLUE_JOB",
-        glue_job_arguments="checked",
-        arguments='{"--source": "https://jsonplaceholder.typicode.com/todos/1", "--destination": "ncu-datapipe"}'
+        "zzz-aws-glue",
+        connection_profile="ZZZ-AWS-GLUE-STANDARD",
+        glue_job_name="customer_csv_to_paraquet",
+        glue_job_arguments="unchecked"
     ),
     "AWS_GlueDataBrew": lambda: JobAwsGlueDataBrew(
         "zzt-aws-glue-databrew",
         description="AWS Glue Databrew",
         connection_profile="ZZZ_AWS_GLUE_DATABREW",
-        job_name="databrew-job"
+        job_name="databrew-job",
+        run_as_dummy=True
     ),
     "AWS_Lambda": lambda: JobAwsLambda(
-        "zzt-aws-lambda",
-        connection_profile="ZZZ_AWS_LAMBDA",
-        function_name="MyTestFunction",
-        parameters='{"param1": 60, "param2": 60}',
+        "zzz-aws-lambda",
+        connection_profile="ZZZ-AWS-LAMBDA",
+        function_name="zzzAWSlambda",
+        parameters='{"key1": "value1", "key2": "value2", "key3": "value3"}',
         append_log_to_output="checked"
     ),
     "AWS_MainframeModernization": lambda: JobAwsMainframeModernization(
@@ -243,7 +274,8 @@ JOB_LIBRARY = {
         action="Start Batch Job",
         jcl_name="DEMO.JCL",
         retrieve_cloud_watch_logs="checked",
-        application_action="Start Application"
+        application_action="Start Application",
+        run_as_dummy=True
     ),
     "AWS_MWAA": lambda: JobAwsMWAA(
         "zzt-aws-mwaa",
@@ -251,14 +283,16 @@ JOB_LIBRARY = {
         action="Run DAG",
         m_w_a_a_environment_name="MyAirflowEnvironment",
         d_a_g_name="example_dag_basic",
-        parameters="{}"
+        parameters="{}",
+        run_as_dummy=True
     ),
     "AWS_QuickSight": lambda: JobAwsQuickSight(
         "zzt-aws-quicksight",
         description="AWS QuickSight",
         connection_profile="ZZZ_AWS_QUICKSIGHT",
         aws_dataset_id="d351ce9e-1500-4494-b0e1-43b2d6f48861",
-        refresh_type="Full Refresh"
+        refresh_type="Full Refresh",
+        run_as_dummy=True
     ),
     "AWS_Redshift": lambda: JobAwsRedshift(
         "zzt-aws-redshift",
@@ -267,7 +301,8 @@ JOB_LIBRARY = {
         actions="Redshift SQL Statement",
         workgroup_name="Workgroup_Name",
         secret_manager_arn="Secret_Manager_ARN",
-        database="Database_Redshift"
+        database="Database_Redshift",
+        run_as_dummy=True
     ),
     "AWS_SageMaker": lambda: JobAwsSageMaker(
         "zzt-aws-sagemaker",
@@ -275,7 +310,8 @@ JOB_LIBRARY = {
         connection_profile="ZZZ_AWS_SAGEMAKER",
         pipeline_name="SageMaker_Pipeline",
         add_parameters="unchecked",
-        retry_pipeline_execution="unchecked"
+        retry_pipeline_execution="unchecked",
+        run_as_dummy=True
     ),
     "AWS_SNS": lambda: JobAwsSNS(
         "zzt-aws-sns",
@@ -293,7 +329,8 @@ JOB_LIBRARY = {
         sender_identifier="Sender ID",
         sender_id="BMC",
         max_price="1.0",
-        sms_type="Transactional"
+        sms_type="Transactional",
+        run_as_dummy=True
     ),
     "AWS_SQS": lambda: JobAwsSQS(
         "zzt-aws-sqs",
@@ -305,14 +342,15 @@ JOB_LIBRARY = {
         message_attributes="checked",
         attribute1_name="Attribute.1",
         attribute1_data_type="String",
-        attribute1_value="CustomValue1"
+        attribute1_value="CustomValue1",
+        run_as_dummy=True
     ),
     "AWS_StepFunctions": lambda: JobAwsStepFunctions(
-        "zzt-aws-stepfunctions",
-        connection_profile="ZZZ_AWS_STEP_FUNCTIONS",
-        execution_name="Step Functions Exec",
-        state_machine_arn="arn:aws:states:us-east-1:155535555553:stateMachine:MyStateMachine",
-        parameters='{"parameter1":"value1"}',
+        "zzz-aws-stepfunctions",
+        connection_profile="ZZZ-AWS-STEP-FUNCTION",
+        execution_name="mqn-state-machine_%%DATE.%%TIME",
+        state_machine_arn="arn:aws:states:us-east-1:390426403709:stateMachine:mqn-state-machine",
+        parameters="{}",
         show_execution_logs="checked"
     ),
     "AZURE_HDInsight": lambda: JobAzureHDInsight(
@@ -323,7 +361,8 @@ JOB_LIBRARY = {
                     '"jars": ["wasb://asafcluster2-2022-06-06t07-39-08-081z@asafcluster2hdistorage.blob.core.windows.net/example/jars/hadoop-mapreduce-examples.jar"],'
                     '"driverMemory": "5G", "driverCores": 3, "executorMemory": "5G", "executorCores": 3, "numExecutors": 1'
                     '}'),
-        bring_job_logs_to_output="checked"
+        bring_job_logs_to_output="checked",
+        run_as_dummy=True
     ),
     "AZURE_Batch": lambda: JobAzureBatchAccounts(
         "zzt-azure-batch-accounts",
@@ -336,41 +375,45 @@ JOB_LIBRARY = {
         retention_time="Custom",
         retention_time_digits="4",
         retention_time_unit="Days",
-        append_log_to_output="checked"
+        append_log_to_output="checked",
+        run_as_dummy=True
     ),
     "AZURE_Databricks": lambda: JobAzureDatabricks(
         "zzt-azure-databricks",
         connection_profile="ZZZ_AZURE_DATABRICKS",
         databricks_job_id="168477649492161",
-        parameters='"notebook_params":{"param1":"val1", "param2":"val2"}'
+        parameters='"notebook_params":{"param1":"val1", "param2":"val2"}',
+        run_as_dummy=True
     ),
     "AZURE_DataFactory": lambda: JobAzureDataFactory(
-        "zzt-azure-datafactory",
-        connection_profile="ZZZ_AZURE_DATAFACTORY",
-        resource_group_name="ZZZ_Group",
-        data_factory_name="zzz-test",
-        pipeline_name="test123",
+        "zzz-azure-datafactory",
+        connection_profile="ZZZ-AZURE-DATA-FACTORY",
+        resource_group_name="automated-demos",
+        data_factory_name="automated-demos",
+        pipeline_name="automated-demo-copy-pipeline",
         parameters="{}"
     ),
     "AZURE_Functions": lambda: JobAzureFunctions(
-        "zzt-azure-function",
-        connection_profile="ZZZ_AZURE_FUNCTIONS",
-        function_app="new-function",
-        function_name="Hello",
-        optional_input_parameters='{"param1":"val1", "param2":"val2"}',
-        function_type="activity"
+        "zzz-azure-function",
+        connection_profile="ZZZ-AZURE-FUNCTION",
+        function_app="automated-demo",
+        function_name="HttpTrigger1",
+        optional_input_parameters="{\"name\":\"Demo Generator\"}",
+        function_type="HTTP"
     ),
     "AZURE_LogicApps": lambda: JobAzureLogicApps(
         "zzt-azure-logicapps",
         connection_profile="ZZZ_AZURE_LOGICAPPS",
         workflow="zzz-logic",
         parameters='{"bodyinfo":"hello from CM"}',
-        get_logs="unchecked"
+        get_logs="unchecked",
+        run_as_dummy=True
     ),
     "AZURE_VM": lambda: JobAzureVM(
         "zzt-azure-vm",
         connection_profile="ZZZ_AZURE_VM",
         operation="Create\\Update",
+        run_as_dummy=True,
         verification_poll_interval="10",
         vm_name="zzz-vm1",
         input_parameters='{"key": "val"}',
@@ -380,7 +423,8 @@ JOB_LIBRARY = {
         "zzt-azure-synapse",
         connection_profile="ZZZ_AZURE_SYNAPSE",
         pipeline_name="zzz_synapse_pipeline",
-        parameters='{"periodinseconds":"40"}'
+        parameters='{"periodinseconds":"40"}',
+        run_as_dummy=True
     ),
     "AZURE_Machine_Learning": lambda: JobAzureMachineLearning(
         "zzt-azure-machine-learning",
@@ -389,7 +433,8 @@ JOB_LIBRARY = {
         workspace_name="ZZZ_ML",
         action="Trigger Endpoint Pipeline",
         pipeline_endpoint_id="353c4707-fd23-40f6-91e2-83bf7cba764c",
-        parameters='{"ExperimentName": "test", "DisplayName":"test1123"}'
+        parameters='{"ExperimentName": "test", "DisplayName":"test1123"}',
+        run_as_dummy=True
     ),
     "AZURE_Backup": lambda: JobAzureBackup(
         "zzt-azure-backup",
@@ -403,7 +448,8 @@ JOB_LIBRARY = {
         restore_to_latest_recovery_point="checked",
         recovery_point_name="142062693017419",
         storage_account_name="stasaccount",
-        restore_region="UK South"
+        restore_region="UK South",
+        run_as_dummy=True
     ),
     "AZURE_Resource_Manager": lambda: JobAzureResourceManager(
         "zzt-azure-resource-manager",
@@ -415,7 +461,8 @@ JOB_LIBRARY = {
             '{"properties": {"templateLink": {"uri": '
             '"https://123.blob.core.windows.net/test123/123.json?sp=r&st=2023-05-23T08:39:09Z&se=2023-06-10T16:39:09Z'
             '&sv=2022-11-02&sr=b&sig=RqrATxi4Sic2UwQKFu%2FlwaQS7fg5uPZyJCQiWX2D%2FCc%3D"}}}'
-        )
+        ),
+        run_as_dummy=True
     ),
     "AZURE_DevOps": lambda: JobAzureDevOps(
         "zzt-azure-devops",
@@ -424,7 +471,8 @@ JOB_LIBRARY = {
         actions="Run Pipeline with More Options",
         pipeline_id="1",
         show_build_logs="checked",
-        stages_to_skip='"Test","Deploy"'
+        stages_to_skip='"Test","Deploy"',
+        run_as_dummy=True
     ),
     "AZURE_Service_Bus": lambda: JobAzureServiceBus(
         "zzt-azure-service-bus",
@@ -432,7 +480,8 @@ JOB_LIBRARY = {
         message_body='{"key1":"value1"}',
         service_bus_namespace="test",
         queue_topic_name="testname",
-        message_format="application/json"
+        message_format="application/json",
+        run_as_dummy=True
     ),
 
     "GCP_Dataflow": lambda: JobGCPDataflow(
@@ -443,7 +492,8 @@ JOB_LIBRARY = {
         template_type="Classic Template",
         template_location_gs_="gs://dataflow-templates-us-central1/latest/Word_Count",
         parameters__json_format='{"jobName": "wordcount11"}',
-        log_level="INFO"
+        log_level="INFO",
+        run_as_dummy=True
     ),
     "GCP_Dataproc": lambda: JobGCPDataproc(
         "zzt-gcp-dataproc",
@@ -451,7 +501,8 @@ JOB_LIBRARY = {
         project_id="applied-lattice-333108",
         account_region="us-central1",
         dataproc_task_type="Workflow Template",
-        workflow_template="<TemplateID>"
+        workflow_template="<TemplateID>",
+        run_as_dummy=True
     ),
     "GCP_Functions": lambda: JobGCPFunctions(
         "zzt-gcp-functions",
@@ -462,7 +513,8 @@ JOB_LIBRARY = {
         get_logs="unchecked",
         location="us-central1",
         function_name="ZZZ_function",
-        project_id="<Project ID>"
+        project_id="<Project ID>",
+        run_as_dummy=True
     ),
     "GCP_VM": lambda: JobGCPVM(
         "zzt-gcp-vm",
@@ -470,7 +522,8 @@ JOB_LIBRARY = {
         project_id="applied-lattice",
         zone="us-central1-f",
         operation="Stop",
-        instance_name="cluster-us-cen1-f-m"
+        instance_name="cluster-us-cen1-f-m",
+        run_as_dummy=True
     ),
     "GCP_BigQuery": lambda: JobGCPBigQuery(
         "zzt-gcp-bigquery",
@@ -479,7 +532,8 @@ JOB_LIBRARY = {
         run_select_query_and_copy_to_table="checked",
         project_name="applied-lattice-333108",
         dataset_name="Test",
-        sql_statement="select * from IFteam"
+        sql_statement="select * from IFteam",
+        run_as_dummy=True
     ),
     "GCP_Dataprep": lambda: JobGCPDataprep(
         "zzt-gcp-dataprep",
@@ -487,7 +541,8 @@ JOB_LIBRARY = {
         flow_name="data_manipulation",
         parameters='{"schemaDriftOptions":{"schemaValidation": "true","stopJobOnErrorsFound": "true"}}',
         execute_job_with_idempotency_token="checked",
-        idempotency_token="Control-M-Token-%%ORDERID"
+        idempotency_token="Control-M-Token-%%ORDERID",
+        run_as_dummy=True
     ),
     "GCP_Dataplex": lambda: JobGCPDataplex(
         "zzt-gcp-dataplex",
@@ -497,7 +552,8 @@ JOB_LIBRARY = {
         action="Data Profiling Scan",
         lake_name="Demo_Lake",
         task_name="Demo_Task",
-        scan_name="Demo"
+        scan_name="Demo",
+        run_as_dummy=True
     ),
     "GCP_DeploymentManager": lambda: JobGCPDeploymentManager(
         "zzt-gcp-deployment-manager",
@@ -505,7 +561,8 @@ JOB_LIBRARY = {
         project_id="applied-lattice-333111",
         action="Create Deployment",
         deployment_name="demo_deployment",
-        yaml_config_content="{resources: [{type: compute.v1.instance, name: quickstart-deployment-vm, properties: {zone: us-central1-f, machineType: 'https://www.googleapis.com/compute/v1/projects/applied-lattice-333108/zones/us-central1-f/machineTypes/e2-micro', disks: [{deviceName: boot, type: PERSISTENT, boot: true, autoDelete: true, initializeParams: {sourceImage: 'https://www.googleapis.com/compute/v1/projects/debian-cloud/global/images/family/debian-11'}}], networkInterfaces: [{network: 'https://www.googleapis.com/compute/v1/projects/applied-lattice-333108/global/networks/default', accessConfigs: [{name: External NAT, type: ONE_TO_ONE_NAT}]}]}}]}"
+        yaml_config_content="{resources: [{type: compute.v1.instance, name: quickstart-deployment-vm, properties: {zone: us-central1-f, machineType: 'https://www.googleapis.com/compute/v1/projects/applied-lattice-333108/zones/us-central1-f/machineTypes/e2-micro', disks: [{deviceName: boot, type: PERSISTENT, boot: true, autoDelete: true, initializeParams: {sourceImage: 'https://www.googleapis.com/compute/v1/projects/debian-cloud/global/images/family/debian-11'}}], networkInterfaces: [{network: 'https://www.googleapis.com/compute/v1/projects/applied-lattice-333108/global/networks/default', accessConfigs: [{name: External NAT, type: ONE_TO_ONE_NAT}]}]}}]}",
+        run_as_dummy=True
     ),
     "GCP_Batch": lambda: JobGCPBatch(
         "zzt-gcp-batch",
@@ -521,7 +578,8 @@ JOB_LIBRARY = {
         log_policy="Cloud Logging",
         use_advanced_json_format="unchecked",
         allowed_locations='["regions us-east1","zones us-east1-b"]',
-        service_account__email_format="example@example.com"
+        service_account__email_format="example@example.com",
+        run_as_dummy=True
     ),
     "GCP_Workflows": lambda: JobGCPWorkflows(
         "zzt-gcp-workflows",
@@ -530,7 +588,8 @@ JOB_LIBRARY = {
         project_id="12345id",
         location="us-central1",
         workflow_name="workflow-1",
-        parameters_json_input='{"argument": "{}"}'
+        parameters_json_input='{"argument": "{}"}',
+        run_as_dummy=True
     ),
     "GCP_Data_Fusion": lambda: JobGCPDataFusion(
         "zzt-gcp-datafusion",
@@ -540,7 +599,8 @@ JOB_LIBRARY = {
         instance_name=" Instance-Name ",
         pipeline_name="TestBatchPipeLine",
         runtime_parameters='{ "Parameter1":"Value1"}',
-        get_logs="checked"
+        get_logs="checked",
+        run_as_dummy=True
     ),
     "GCP_CloudRun": lambda: JobGCPCloudRun(
         "zzt-gcp-cloudrun",
@@ -548,21 +608,24 @@ JOB_LIBRARY = {
         project_id="applied-lattice-333108",
         location="us-central1",
         job_name="testjob",
-        overrides_specification="{}"
+        overrides_specification="{}",
+        run_as_dummy=True
     ),
     "GCP_Composer": lambda: JobGCPComposer(
         "zzt-gcp-composer",
         connection_profile="ZZZ_GCP_COMPOSER",
         action="Run DAG",
         d_a_g_name="example_dag_basic",
-        parameters="{}"
+        parameters="{}",
+        run_as_dummy=True
     ),
 
     "OCI_VM": lambda: JobOCIVM(
         "zzt-oci-vm",
         connection_profile="ZZZ_OCI_VM",
         action="Start",
-        parameters='{...}'  # Consider storing the full JSON in a separate variable or file for readability
+        parameters='{...}',  # Consider storing the full JSON in a separate variable or file for readability
+        run_as_dummy=True
     ),
     "OCI_DataIntegration": lambda: JobOCIDataIntegration(
         "zzt-oci-data-integrations",
@@ -572,19 +635,22 @@ JOB_LIBRARY = {
         task_key="b5636bc5-d672-9ca0-84a0-9b20c17d0bda",
         workspace_ocid="ocid1.disworkspace.oc1.phx.anyhqljr2ow634yaho5mitq5jxqcreq4kt3ycpoltpakb57flphqowx3eeia",
         task_run_name="Task1",
-        task_run_input_parameters='"PARAMETER": {"simpleValue": "Hello"}, "PARAMETER2": {"simpleValue": "Hello222"}'
+        task_run_input_parameters='"PARAMETER": {"simpleValue": "Hello"}, "PARAMETER2": {"simpleValue": "Hello222"}',
+        run_as_dummy=True
     ),
     "OCI_DataFlow": lambda: JobOCIDataFlow(
         "zzt-oci-data-flow",
         connection_profile="ZZZ_OCI_DATAFLOW",
         compartment_ocid="ocid1.compartment.oc1..aaaaaaaahjoxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-        application_ocid="ocid1.dataflowapplication.oc1.phx.anyhqljrtxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        application_ocid="ocid1.dataflowapplication.oc1.phx.anyhqljrtxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        run_as_dummy=True
     ),
     "OCI_DataScience": lambda: JobOCIDataScience(
         "zzt-oci-data-science",
         connection_profile="ZZZ_OCI_DATASCIENCE",
         action="Start Job Run",
-        parameters='{...}'  # same as above: long JSON string can be offloaded
+        parameters='{...}',  # same as above: long JSON string can be offloaded
+        run_as_dummy=True
     ),
     "Ansible_AWX": lambda: JobAnsibleAWX(
         "zzt-ansible-awx",
@@ -593,20 +659,23 @@ JOB_LIBRARY = {
         job_template_name="Demo Job Template",
         inventory="Demo Inventory",
         parameters='{"tempo": "30"}',
-        output_logs="checked"
+        output_logs="checked",
+        run_as_dummy=True
     ),
     "Automation_Anywhere": lambda: JobAutomationAnywhere(
         "zzt-automation-anywhere",
         connection_profile="ZZZ_AUTOMATION_ANYWHERE",
         automation_type="Bot",
-        bot_input_parameters='{"One": {"type": "STRING", "string": "Hello world, go be great."}, "Num": {"type": "NUMBER", "number": 11}}'
+        bot_input_parameters='{"One": {"type": "STRING", "string": "Hello world, go be great."}, "Num": {"type": "NUMBER", "number": 11}}',
+        run_as_dummy=True
     ),
     "DBT": lambda: JobDBT(
         "zzt-dbt",
         connection_profile="ZZZ_DBT",
         override_job_commands="checked",
         dbt_job_id="12345",
-        run_comment="A text description"
+        run_comment="A text description",
+        run_as_dummy=True
     ),
     "MS_PowerBI": lambda: JobMicrosoftPowerBI(
         "zzt-ms-power-bi",
@@ -615,14 +684,16 @@ JOB_LIBRARY = {
         workspace_name="Demo",
         workspace_id="a7979345-8cfe-44e7-851f-81560e67973d",
         dataset_id="a7979345-8c",
-        parameters='{"type":"Full","commitMode":"transactional","maxParallelism":20,"retryCount":2}'
+        parameters='{"type":"Full","commitMode":"transactional","maxParallelism":20,"retryCount":2}',
+        run_as_dummy=True
     ),
     "Terraform": lambda: JobTerraform(
         "zzt-terraform",
         connection_profile="ZZZ_TERRAFORM",
         action="Run Workspace",
         workspace_name="AWS-terraform",
-        workspace_params='{"key": "ec2_status", "value": "running"}'
+        workspace_params='{"key": "ec2_status", "value": "running"}',
+        run_as_dummy=True
     ),
     "UI_Path": lambda: JobUIPath(
         "zzt-ui-path",
@@ -631,13 +702,15 @@ JOB_LIBRARY = {
         folder_id="374915",
         process_name="control-m-demo-process",
         robot_name="zzz-ctm-bot",
-        robot_id="153158"
+        robot_id="153158",
+        run_as_dummy=True
     ),
     "Tableau": lambda: JobTableau(
         "zzt-tableau",
         connection_profile="ZZZ_TABLEAU",
         action="Refresh Datasource",
-        datasource_name="BQ_Dataset"
+        datasource_name="BQ_Dataset",
+        run_as_dummy=True
     ),
     "Jenkins": lambda: JobJenkins(
         "zzt-jenkins",
@@ -645,7 +718,8 @@ JOB_LIBRARY = {
         pipeline_name="Demo",
         add_parameters="checked",
         add_branch_name="checked",
-        branch_name="Development"
+        branch_name="Development",
+        run_as_dummy=True
     ),
     "Apache_NiFi": lambda: JobApacheNiFi(
         "zzt-apache-nifi",
@@ -653,7 +727,8 @@ JOB_LIBRARY = {
         processor_group_id="2b315548-a11b-1ff4-c672-770c0ba49da3",
         processor_id="2b315c50-a11b-1ff4-99f2-690aa6f35952v",
         action="Run Processor",
-        disconnected_node_ack="unchecked"
+        disconnected_node_ack="unchecked",
+        run_as_dummy=True
     ),
     "Apache_Airflow": lambda: JobApacheAirflow(
         "zzt-apache-airflow",
@@ -661,6 +736,18 @@ JOB_LIBRARY = {
         action="Run DAG",
         d_a_g_name="Example_DAG",
         d_a_g_run_id="RunID-1",
-        parameters='{"variable": "Value"}'
+        parameters='{"variable": "Value"}',
+        run_as_dummy=True
+    ),
+    "WebServiceREST": lambda: JobWebServicesREST(
+        "zzz-webservice-rest",
+        connection_profile="ZZZ-WEBSERVICES-REST",
+        endpoint_url="https://api.openweathermap.org",
+        url_request_path="/data/2.5/weather",
+        append_request="checked",
+        append_response="checked",
+        variables=[{"appid": "481be8b9210a09cc3a3bcdcf190a3aa8"},{"zipcode": "75000"}],
+        url_parameters=[{"zip": "%%zipcode,fr"},{"appid": "%%appid"},{"units": "metric"}],
+        output_handling=[{"HttpCode": "200","Parameter": "$.main.temp","Variable": "TEMPERATURE"},{"HttpCode": "200","Parameter": "$.name","Variable": "CITY"}]
     )
             }
